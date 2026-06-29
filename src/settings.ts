@@ -18,6 +18,8 @@ export interface ReadItLaterSettings {
     youtubeEmbedWidth: string;
     youtubeEmbedHeight: string;
     youtubeUsePrivacyEnhancedEmbed: boolean;
+    youtubeFetchTranscript: boolean;
+    youtubeTranscriptLanguage: string;
     vimeoContentTypeSlug: string;
     vimeoNoteTitle: string;
     vimeoNote: string;
@@ -93,11 +95,13 @@ export const DEFAULT_SETTINGS: ReadItLaterSettings = {
     youtubeContentTypeSlug: 'youtube',
     youtubeNoteTitle: 'Youtube - {{ title }}',
     youtubeNote:
-        '[[ReadItLater]] [[Youtube]]\n\n# [{{ videoTitle }}]({{ videoURL }})\n\n{{ videoPlayer }}\n\n{{ videoChapters }}',
+        '[[ReadItLater]] [[Youtube]]\n\n# [{{ videoTitle }}]({{ videoURL }})\n\n{{ videoPlayer }}\n\n{{ videoChapters }}\n\n## Transcript\n\n{{ videoTranscript }}',
     youtubeChapter: '- [{{ chapterTimestamp }}]({{ chapterUrl }}) {{ chapterTitle }}',
     youtubeEmbedWidth: '560',
     youtubeEmbedHeight: '315',
     youtubeUsePrivacyEnhancedEmbed: true,
+    youtubeFetchTranscript: true,
+    youtubeTranscriptLanguage: '',
     vimeoContentTypeSlug: 'vimeo',
     vimeoNoteTitle: 'Vimeo - {{ title }}',
     vimeoNote:

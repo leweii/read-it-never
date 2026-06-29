@@ -20,6 +20,7 @@ interface YoutubeNoteData {
     videoTags: string;
     videoPlayer: string;
     videoChapters: string;
+    videoTranscript: string;
     channelId: string;
     channelName: string;
     channelURL: string;
@@ -106,6 +107,8 @@ class YoutubeParser extends Parser {
 
             const chapters = this.getVideoChapters(video.snippet.description);
 
+            const videoTranscript = await this.getVideoTranscript(video.id);
+
             return {
                 date: this.getFormattedDateForContent(createdAt),
                 videoId: video.id,
@@ -124,6 +127,7 @@ class YoutubeParser extends Parser {
                 videoViewsCount: video.statistics.viewCount,
                 videoTags: tags.join(' '),
                 videoChapters: this.formatVideoChapters(video.id, chapters),
+                videoTranscript: videoTranscript,
                 channelId: channel.id,
                 channelURL: `https://www.youtube.com/channel/${channel.id}`,
                 channelName: channel.snippet.title ?? '',
@@ -183,6 +187,8 @@ class YoutubeParser extends Parser {
                 videoSchemaElement?.querySelector('[itemprop="channelId"]')?.getAttribute('content') ??
                 '';
 
+            const videoTranscript = await this.getVideoTranscript(videoId, videoHTML);
+
             return {
                 date: this.getFormattedDateForContent(createdAt),
                 videoId: videoId,
@@ -198,6 +204,7 @@ class YoutubeParser extends Parser {
                 videoViewsCount: videoViewsCount,
                 videoTags: '',
                 videoChapters: this.formatVideoChapters(videoId, chapters),
+                videoTranscript: videoTranscript,
                 channelId: channelId,
                 channelURL: personSchemaElement?.querySelector('[itemprop="url"]')?.getAttribute('href') ?? '',
                 channelName: personSchemaElement?.querySelector('[itemprop="name"]')?.getAttribute('content') ?? '',
@@ -287,6 +294,77 @@ class YoutubeParser extends Parser {
         }
 
         return chapters;
+    }
+
+    /**
+     * Fetches the video transcript (closed captions) as plain text.
+     *
+     * The captions track list lives in the `ytInitialPlayerResponse` object embedded in the watch
+     * page. When the schema is parsed we already have the page document and can reuse it; otherwise
+     * (e.g. when the YouTube Data API is used) we fetch the watch page here.
+     */
+    private async getVideoTranscript(videoId: string, videoHTML?: Document): Promise<string> {
+        if (!this.plugin.settings.youtubeFetchTranscript) {
+            return '';
+        }
+
+        try {
+            let document = videoHTML;
+            if (typeof document === 'undefined') {
+                const response = await request({
+                    method: 'GET',
+                    url: `https://www.youtube.com/watch?v=${videoId}`,
+                    headers: { ...desktopBrowserUserAgent },
+                });
+                document = new DOMParser().parseFromString(response, 'text/html');
+            }
+
+            const declaration = getJavascriptDeclarationByName(
+                'ytInitialPlayerResponse',
+                document.querySelectorAll('script'),
+            );
+            if (typeof declaration === 'undefined') {
+                return '';
+            }
+
+            const playerResponse = JSON.parse(declaration.value);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const captionTracks: any[] = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+            if (captionTracks.length === 0) {
+                return '';
+            }
+
+            const preferredLanguage = this.plugin.settings.youtubeTranscriptLanguage;
+            const track =
+                (preferredLanguage !== ''
+                    ? captionTracks.find((captionTrack) => captionTrack.languageCode === preferredLanguage)
+                    : undefined) ??
+                captionTracks.find((captionTrack) => captionTrack.kind !== 'asr') ??
+                captionTracks[0];
+
+            const transcriptResponse = await request({
+                method: 'GET',
+                url: `${track.baseUrl}&fmt=json3`,
+                headers: { ...desktopBrowserUserAgent },
+            });
+
+            return this.parseTranscript(transcriptResponse);
+        } catch (error) {
+            // A missing/unavailable transcript should not block note creation.
+            return '';
+        }
+    }
+
+    private parseTranscript(raw: string): string {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const events: any[] = JSON.parse(raw)?.events ?? [];
+
+        return events
+            .filter((event) => Array.isArray(event.segs))
+            .map((event) => event.segs.map((segment: { utf8?: string }) => segment.utf8 ?? '').join(''))
+            .join('')
+            .replace(/\s+/g, ' ')
+            .trim();
     }
 
     private getEmbedPlayer(videoId: string): string {

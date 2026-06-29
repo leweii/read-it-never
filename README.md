@@ -173,6 +173,7 @@ If enabled, images will be downloaded to folder (default is `ReadItLater Inbox/a
 | channelURL                | Channel URL on Youtube.com                                           |
 | videoThumbnail            | Video thumbnail image URL                                            |
 | videoChapters             | List of video chapters with linked timestamps                        |
+| videoTranscript           | Video transcript (closed captions) as plain text                     |
 | videoPublishDate          | Video plublish date formatted in content format from plugin settings |
 | videoViewsCount           | Video views count                                                    |
 

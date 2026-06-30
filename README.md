@@ -173,7 +173,7 @@ If enabled, images will be downloaded to folder (default is `ReadItLater Inbox/a
 | channelURL                | Channel URL on Youtube.com                                           |
 | videoThumbnail            | Video thumbnail image URL                                            |
 | videoChapters             | List of video chapters with linked timestamps                        |
-| videoTranscript           | Video transcript (closed captions) as plain text                     |
+| videoTranscript           | Video transcript (closed captions), one timestamped line per caption |
 | videoPublishDate          | Video plublish date formatted in content format from plugin settings |
 | videoViewsCount           | Video views count                                                    |
 
@@ -183,6 +183,13 @@ If enabled, images will be downloaded to folder (default is `ReadItLater Inbox/a
 | chapterTimestamp          | Chapter start time in mm:ss   |
 | chapterSeconds            | Chapter start time in seconds |
 | chapterUrl                | Url to chapter start          |
+
+| Transcript line template variable | Description                          |
+| --------------------------------- | ------------------------------------ |
+| transcriptText                    | Caption text for the line            |
+| transcriptTimestamp               | Line start time in mm:ss             |
+| transcriptSeconds                 | Line start time in seconds           |
+| transcriptUrl                     | Url to the video at the line's start |
 
 Parsing of HTML DOM has its limitations thus additional data can be fetched only from [Google API](https://developers.google.com/youtube/v3/getting-started). Retrieved API key can be set in plugin settings and then plugin will use the Google API for fetching data.
 

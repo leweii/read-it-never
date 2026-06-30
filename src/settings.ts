@@ -20,6 +20,8 @@ export interface ReadItLaterSettings {
     youtubeUsePrivacyEnhancedEmbed: boolean;
     youtubeFetchTranscript: boolean;
     youtubeTranscriptLanguage: string;
+    youtubeTranscriptLine: string;
+    youtubeTranscriptLinesPerBlock: number;
     vimeoContentTypeSlug: string;
     vimeoNoteTitle: string;
     vimeoNote: string;
@@ -102,6 +104,8 @@ export const DEFAULT_SETTINGS: ReadItLaterSettings = {
     youtubeUsePrivacyEnhancedEmbed: true,
     youtubeFetchTranscript: true,
     youtubeTranscriptLanguage: '',
+    youtubeTranscriptLine: '[{{ transcriptTimestamp }}]({{ transcriptUrl }}) {{ transcriptText }}',
+    youtubeTranscriptLinesPerBlock: 5,
     vimeoContentTypeSlug: 'vimeo',
     vimeoNoteTitle: 'Vimeo - {{ title }}',
     vimeoNote:

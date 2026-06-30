@@ -210,7 +210,11 @@ class YoutubeParser extends Parser {
                 videoDuration: 0,
                 videoDurationFormatted: '',
                 videoPublishDate:
-                    publishedAt !== '' ? moment(publishedAt).format(this.plugin.settings.dateContentFmt) : '',
+                    publishedAt !== ''
+                        ? moment(publishedAt, ['MMM D, YYYY', 'MMMM D, YYYY', 'D MMM YYYY', moment.ISO_8601]).format(
+                              this.plugin.settings.dateContentFmt,
+                          )
+                        : '',
                 videoViewsCount: videoViewsCount,
                 videoTags: '',
                 videoChapters: this.formatVideoChapters(videoId, chapters),

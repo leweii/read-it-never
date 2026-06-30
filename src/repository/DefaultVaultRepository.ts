@@ -1,13 +1,13 @@
-import { Note } from 'src/parsers/Note';
 import { CapacitorAdapter, FileSystemAdapter, Notice, TFile, TFolder, normalizePath } from 'obsidian';
+import FileExistsError from '../error/FileExists';
+import { VaultRepository } from './VaultRepository';
+import { Note } from 'src/parsers/Note';
 import ReadItNeverPlugin from 'src/main';
 import { getOsOptimizedPath } from 'src/helpers/fileutils';
 import TemplateEngine from 'src/template/TemplateEngine';
 import { formatDate } from 'src/helpers/date';
 import { t } from 'src/i18n';
 import FileNotFoundError from 'src/error/FileNotFound';
-import FileExistsError from '../error/FileExists';
-import { VaultRepository } from './VaultRepository';
 
 export default class DefaultVaultRepository implements VaultRepository {
     private plugin: ReadItNeverPlugin;

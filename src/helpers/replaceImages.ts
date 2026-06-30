@@ -1,8 +1,8 @@
 import { CapacitorAdapter, DataAdapter, FileSystemAdapter, normalizePath, requestUrl } from 'obsidian';
-import { HTTPS_PROTOCOL, HTTP_PROTOCOL } from 'src/constants/urlProtocols';
-import ReadItNeverPlugin from 'src/main';
 import { FilesystemLimits, getFileExtensionFromMimeType, getOsOptimizedPath, isValidUrl } from './fileutils';
 import { createRandomString } from './stringUtils';
+import { HTTPS_PROTOCOL, HTTP_PROTOCOL } from 'src/constants/urlProtocols';
+import ReadItNeverPlugin from 'src/main';
 
 type Replacer = {
     (match: string, anchor: string, link: string): Promise<string>;

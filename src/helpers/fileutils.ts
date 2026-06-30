@@ -1,6 +1,6 @@
 import { CapacitorAdapter, FileSystemAdapter, Platform, normalizePath } from 'obsidian';
-import { ReadItNeverSettings } from 'src/settings';
 import mime from 'mime';
+import { ReadItNeverSettings } from 'src/settings';
 
 export interface FilesystemLimits {
     path: number;

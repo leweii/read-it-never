@@ -1,6 +1,6 @@
+import { isValidUrl } from './fileutils';
 import { Delimiter, getDelimiterValue } from 'src/enums/delimiter';
 import { HTTPS_PROTOCOL, HTTP_PROTOCOL } from 'src/constants/urlProtocols';
-import { isValidUrl } from './fileutils';
 
 export function createRandomString(length: number) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';

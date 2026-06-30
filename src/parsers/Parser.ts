@@ -1,9 +1,9 @@
 import { App } from 'obsidian';
+import { Note } from './Note';
 import TemplateEngine from 'src/template/TemplateEngine';
 import ReadItNeverPlugin from 'src/main';
 import { isValidUrl } from 'src/helpers/fileutils';
 import { formatDate } from 'src/helpers/date';
-import { Note } from './Note';
 
 export abstract class Parser {
     protected app: App;

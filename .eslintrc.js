@@ -8,7 +8,7 @@ module.exports = {
         'plugin:prettier/recommended',
         'eslint:recommended',
         'plugin:@typescript-eslint/eslint-recommended',
-        'plugin:import/typescript',
+        'plugin:import-x/typescript',
     ],
     globals: {
         Atomics: 'readonly',
@@ -22,7 +22,7 @@ module.exports = {
             modules: true,
         },
     },
-    plugins: ['@typescript-eslint', 'import'],
+    plugins: ['@typescript-eslint', 'import-x'],
     rules: {
         'linebreak-style': ['error', 'unix'],
         quotes: ['error', 'single', { avoidEscape: true }],
@@ -40,7 +40,7 @@ module.exports = {
             },
         ],
         semi: ['error', 'always'],
-        'import/order': 'error',
+        'import-x/order': 'error',
         'sort-imports': [
             'error',
             {

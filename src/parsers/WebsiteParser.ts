@@ -1,13 +1,13 @@
 import { Notice, Platform, RequestUrlResponse, requestUrl } from 'obsidian';
 import { Readability, isProbablyReaderable } from '@mozilla/readability';
-import * as DOMPurify from 'isomorphic-dompurify';
+import DOMPurify from 'isomorphic-dompurify';
+import { Note } from './Note';
+import { Parser } from './Parser';
+import { parseHtmlContent } from './parsehtml';
 import { getBaseUrl, normalizeFilename } from 'src/helpers/fileutils';
 import { replaceImages } from 'src/helpers/replaceImages';
 import { desktopBrowserUserAgent } from 'src/helpers/networkUtils';
 import { t } from 'src/i18n';
-import { Note } from './Note';
-import { Parser } from './Parser';
-import { parseHtmlContent } from './parsehtml';
 
 interface ReadabilityArticle {
     title: string;

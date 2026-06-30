@@ -1,7 +1,7 @@
 import { requestUrl } from 'obsidian';
-import { handleError } from 'src/helpers/error';
 import { Note } from './Note';
 import { Parser } from './Parser';
+import { handleError } from 'src/helpers/error';
 
 interface BilibiliViewResponse {
     code: number;

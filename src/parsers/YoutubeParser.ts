@@ -1,11 +1,11 @@
 import { request } from 'obsidian';
 import { Duration, parse, toSeconds } from 'iso8601-duration';
+import { Note } from './Note';
+import { Parser } from './Parser';
 import { handleError } from 'src/helpers/error';
 import { typedMoment } from 'src/helpers/moment';
 import { getJavascriptDeclarationByName } from 'src/helpers/domUtils';
 import { desktopBrowserUserAgent } from 'src/helpers/networkUtils';
-import { Note } from './Note';
-import { Parser } from './Parser';
 
 // YouTube's public InnerTube API key and an iOS client User-Agent. The iOS client returns caption
 // track URLs that work without a proof-of-origin token; see `getVideoTranscript`.

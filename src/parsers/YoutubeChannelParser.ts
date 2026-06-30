@@ -1,9 +1,9 @@
 import { request } from 'obsidian';
+import { Note } from './Note';
+import { Parser } from './Parser';
 import { getJavascriptDeclarationByName } from 'src/helpers/domUtils';
 import { handleError } from 'src/helpers/error';
 import { desktopBrowserUserAgent } from 'src/helpers/networkUtils';
-import { Note } from './Note';
-import { Parser } from './Parser';
 
 type YoutubeChannelNoteData = {
     date: string;

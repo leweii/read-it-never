@@ -140,7 +140,7 @@ class MastodonParser extends Parser {
 
             return response as Status;
         } catch (error) {
-            handleError(error as Error, 'Unable to load Mastodon status.');
+            handleError(error, 'Unable to load Mastodon status.');
         }
     }
 

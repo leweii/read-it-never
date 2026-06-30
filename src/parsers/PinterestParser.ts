@@ -66,7 +66,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function asRelayResponse(value: unknown): PinterestRelayResponse {
-    return isRecord(value) ? (value as PinterestRelayResponse) : {};
+    return isRecord(value) ? value : {};
 }
 
 export class PinterestParser extends Parser {

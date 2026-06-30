@@ -22,7 +22,8 @@ export default class TemplateEngine {
                 if (!this.validateFilterValueType(value, 'blockquote', stringableTypes)) {
                     return value;
                 }
-                return String(value)
+                const stringable = value as string | number | bigint | symbol;
+                return String(stringable)
                     .split('\n')
                     .map((line) => `> ${line}`)
                     .join('\n');
@@ -31,14 +32,17 @@ export default class TemplateEngine {
                 if (!this.validateFilterValueType(value, 'capitalize', stringableTypes)) {
                     return value;
                 }
-                const str = String(value);
+                const stringable = value as string | number | bigint | symbol;
+                const str = String(stringable);
                 return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
             },
             join: (value: unknown, separator: unknown = ',') => {
                 if (!this.validateFilterValueType(value, 'join', ['array'])) {
                     return value;
                 }
-                return (value as unknown[]).join(String(separator));
+                const items = value as (string | number | bigint | symbol)[];
+                const sep = separator as string | number | bigint | symbol;
+                return items.join(String(sep));
             },
             numberLexify: (value: unknown) => {
                 return lexify(value as number);
@@ -47,7 +51,8 @@ export default class TemplateEngine {
                 if (!this.validateFilterValueType(value, 'lower', stringableTypes)) {
                     return value;
                 }
-                String(value).toLowerCase();
+                const stringable = value as string | number | bigint | symbol;
+                String(stringable).toLowerCase();
             },
             map: (value: unknown, transform: unknown) => {
                 if (!this.validateFilterValueType(value, 'map', ['array'])) {
@@ -64,23 +69,29 @@ export default class TemplateEngine {
                 if (!this.validateFilterValueType(value, 'replace', stringableTypes)) {
                     return value;
                 }
-                return String(value).replaceAll(String(search), String(replacement));
+                const stringable = value as string | number | bigint | symbol;
+                const searchStringable = search as string | number | bigint | symbol;
+                const replacementStringable = replacement as string | number | bigint | symbol;
+                return String(stringable).replaceAll(String(searchStringable), String(replacementStringable));
             },
             striptags: (value: unknown, allowedTags: unknown = '') => {
                 if (!this.validateFilterValueType(value, 'striptags', stringableTypes)) {
                     return value;
                 }
+                const allowedTagsStringable = allowedTags as string | number | bigint | symbol;
+                const stringable = value as string | number | bigint | symbol;
                 const regex = new RegExp(
-                    `<(?!/?(${String(allowedTags).replace(/[<>]/g, '').split(',').join('|')})s*/?)[^>]+>`,
+                    `<(?!/?(${String(allowedTagsStringable).replace(/[<>]/g, '').split(',').join('|')})s*/?)[^>]+>`,
                     'gi',
                 );
-                return String(value).replace(regex, '');
+                return String(stringable).replace(regex, '');
             },
             upper: (value: unknown) => {
                 if (!this.validateFilterValueType(value, 'upper', stringableTypes)) {
                     return value;
                 }
-                String(value).toUpperCase();
+                const stringable = value as string | number | bigint | symbol;
+                String(stringable).toUpperCase();
             },
         };
     }
@@ -115,7 +126,8 @@ export default class TemplateEngine {
                     return match;
                 }
 
-                return String(value);
+                const stringable = value as string | number | bigint | symbol;
+                return String(stringable);
             } catch (e) {
                 console.warn(`Error processing simple pattern "${match}":`, e);
                 return match;
@@ -150,7 +162,8 @@ export default class TemplateEngine {
                 for (const modifier of modifiers) {
                     processedValue = this.applyModifier(processedValue, modifier);
                 }
-                return String(processedValue);
+                const stringable = processedValue as string | number | bigint | symbol;
+                return String(stringable);
             } catch (e) {
                 console.warn(`Error processing variable "${match}":`, e);
                 return match;

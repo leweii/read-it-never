@@ -66,12 +66,42 @@ interface YoutubeInitialData {
     };
 }
 
+interface YoutubeChannelApiThumbnail {
+    url: string;
+}
+
+interface YoutubeChannelApiThumbnails {
+    default?: YoutubeChannelApiThumbnail;
+    medium?: YoutubeChannelApiThumbnail;
+    high?: YoutubeChannelApiThumbnail;
+}
+
+// Shape of the YouTube Data API v3 channel resource actually consumed below.
+interface YoutubeApiChannelResource {
+    id: string;
+    snippet: {
+        title: string;
+        description: string;
+        thumbnails?: YoutubeChannelApiThumbnails;
+    };
+    brandingSettings?: {
+        image?: { bannerExternalUrl?: string };
+    };
+    statistics: {
+        subscriberCount: number;
+        videoCount: number;
+    };
+}
+
 interface YoutubeChannelApiResponse {
-    items: GoogleApiYouTubeChannelResource[];
+    items: YoutubeApiChannelResource[];
 }
 
 function toError(error: unknown): Error {
-    return error instanceof Error ? error : new Error(String(error));
+    if (error instanceof Error) {
+        return error;
+    }
+    return new Error(typeof error === 'string' ? error : JSON.stringify(error));
 }
 
 export default class YoutubeChannelParser extends Parser {
@@ -180,7 +210,7 @@ export default class YoutubeChannelParser extends Parser {
             if (channelJsonResponse.items.length === 0) {
                 throw new Error(`Channel (${url}) cannot be fetched from API`);
             }
-            const channel: GoogleApiYouTubeChannelResource = channelJsonResponse.items[0];
+            const channel: YoutubeApiChannelResource = channelJsonResponse.items[0];
 
             return {
                 date: this.getFormattedDateForContent(createdAt),

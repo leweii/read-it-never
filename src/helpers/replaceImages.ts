@@ -28,17 +28,15 @@ async function replaceAsync(content: string, searchValue: string | RegExp, repla
             // 2. Resolve them with `Promise.all`
             // 3. Run `replace` with resolved values
             const values: Promise<string>[] = [];
-            String.prototype.replace.call(content, searchValue, function (match: string, anchor: string, link: string) {
+            content.replace(searchValue, (match: string, anchor: string, link: string) => {
                 values.push(replacer(match, anchor, link));
                 return '';
             });
-            return Promise.all(values).then(function (resolvedValues) {
-                return String.prototype.replace.call(content, searchValue, function () {
-                    return resolvedValues.shift() ?? '';
-                }) as string;
-            });
+            return Promise.all(values).then((resolvedValues) =>
+                content.replace(searchValue, () => resolvedValues.shift() ?? ''),
+            );
         } else {
-            return Promise.resolve(String.prototype.replace.call(content, searchValue, replacer) as string);
+            return Promise.resolve(content.replace(searchValue, replacer as unknown as string));
         }
     } catch (error) {
         console.error();

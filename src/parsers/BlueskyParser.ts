@@ -1,5 +1,6 @@
-import { Notice, moment, request } from 'obsidian';
+import { Notice, request } from 'obsidian';
 import { normalizeFilename } from 'src/helpers/fileutils';
+import { typedMoment } from 'src/helpers/moment';
 import { replaceImages } from 'src/helpers/replaceImages';
 import { handleError } from 'src/helpers/error';
 import { Note } from './Note';
@@ -58,7 +59,7 @@ interface ApiAuthor {
 }
 
 interface ApiFacetFeature {
-    $type: string;
+    $type: FacetTypeApi;
     did?: string;
     uri?: string;
     tag?: string;
@@ -282,7 +283,7 @@ export class BlueskyParser extends Parser {
                     replyCount: reply.post.replyCount,
                     repostCount: reply.post.repostCount,
                     quoteCount: reply.post.replyCount,
-                    publishedAt: moment(reply.post.record.createdAt).toDate(),
+                    publishedAt: typedMoment(reply.post.record.createdAt).toDate(),
                     facets: reply.post.record?.facets?.map((facet) => this.makeFacet(facet)) ?? [],
                 });
             });
@@ -299,7 +300,7 @@ export class BlueskyParser extends Parser {
                 replyCount: response.thread.post.replyCount,
                 repostCount: response.thread.post.repostCount,
                 quoteCount: response.thread.post.replyCount,
-                publishedAt: moment(response.thread.post.record.createdAt).toDate(),
+                publishedAt: typedMoment(response.thread.post.record.createdAt).toDate(),
                 facets: response.thread.post.record?.facets?.map((facet) => this.makeFacet(facet)) ?? [],
                 replies: replies,
             };

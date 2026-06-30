@@ -1,6 +1,7 @@
-import { moment, request } from 'obsidian';
+import { request } from 'obsidian';
 import { Duration, parse, toSeconds } from 'iso8601-duration';
 import { handleError } from 'src/helpers/error';
+import { typedMoment } from 'src/helpers/moment';
 import { getJavascriptDeclarationByName } from 'src/helpers/domUtils';
 import { desktopBrowserUserAgent } from 'src/helpers/networkUtils';
 import { Note } from './Note';
@@ -32,8 +33,45 @@ type YoutubeNoteData = {
     extra: YoutubeVideo;
 };
 
+interface YoutubeThumbnail {
+    url: string;
+    width?: number;
+    height?: number;
+}
+
+interface YoutubeThumbnails {
+    default?: YoutubeThumbnail;
+    medium?: YoutubeThumbnail;
+    high?: YoutubeThumbnail;
+    standard?: YoutubeThumbnail;
+    maxres?: YoutubeThumbnail;
+}
+
+// Shape of the YouTube Data API v3 video/channel resources actually consumed below.
+interface YoutubeApiVideoResource {
+    id: string;
+    snippet: {
+        channelId: string;
+        title: string;
+        description: string;
+        publishedAt: string;
+        thumbnails?: YoutubeThumbnails;
+        tags?: string[];
+    };
+    contentDetails: { duration: string };
+    statistics: { viewCount: number | string };
+}
+
+interface YoutubeApiChannelResource {
+    id: string;
+    snippet: {
+        title?: string;
+        thumbnails?: YoutubeThumbnails;
+    };
+}
+
 interface YoutubeVideo {
-    thumbnails: GoogleApiYouTubeThumbnailResource;
+    thumbnails?: YoutubeThumbnails;
     publishedAt: Date;
     tags: string[];
     channel: YoutubeChannel;
@@ -58,16 +96,16 @@ interface YoutubeCaptionTrack {
 }
 
 interface YoutubeChannel {
-    thumbnails: GoogleApiYouTubeThumbnailResource;
+    thumbnails?: YoutubeThumbnails;
 }
 
 // Shape of the YouTube Data API v3 list responses (videos/channels) actually consumed below.
 interface YoutubeApiVideoListResponse {
-    items: GoogleApiYouTubeVideoResource[];
+    items: YoutubeApiVideoResource[];
 }
 
 interface YoutubeApiChannelListResponse {
-    items: GoogleApiYouTubeChannelResource[];
+    items: YoutubeApiChannelResource[];
 }
 
 // Shape of the InnerTube `player` endpoint response fields consumed in `getVideoTranscript`.
@@ -172,7 +210,7 @@ class YoutubeParser extends Parser {
             if (videoJsonResponse.items.length === 0) {
                 throw new Error(`Video (${url}) cannot be fetched from API`);
             }
-            const video: GoogleApiYouTubeVideoResource = videoJsonResponse.items[0];
+            const video: YoutubeApiVideoResource = videoJsonResponse.items[0];
 
             const channelApiResponse = await request({
                 method: 'GET',
@@ -185,7 +223,7 @@ class YoutubeParser extends Parser {
             if (channelJsonResponse.items.length === 0) {
                 throw new Error(`Channel (${video.snippet.channelId}) cannot be fetched from API`);
             }
-            const channel: GoogleApiYouTubeChannelResource = channelJsonResponse.items[0];
+            const channel: YoutubeApiChannelResource = channelJsonResponse.items[0];
 
             const duration = parse(video.contentDetails.duration);
 
@@ -210,7 +248,7 @@ class YoutubeParser extends Parser {
                 videoPlayer: this.getEmbedPlayer(video.id),
                 videoDuration: toSeconds(duration),
                 videoDurationFormatted: this.formatDuration(duration),
-                videoPublishDate: moment(video.snippet.publishedAt).format(this.plugin.settings.dateContentFmt),
+                videoPublishDate: typedMoment(video.snippet.publishedAt).format(this.plugin.settings.dateContentFmt),
                 videoViewsCount: video.statistics.viewCount,
                 videoTags: tags.join(' '),
                 videoChapters: this.formatVideoChapters(video.id, chapters),
@@ -220,7 +258,7 @@ class YoutubeParser extends Parser {
                 channelName: channel.snippet.title ?? '',
                 extra: {
                     thumbnails: video.snippet.thumbnails,
-                    publishedAt: moment(video.snippet.publishedAt).toDate(),
+                    publishedAt: typedMoment(video.snippet.publishedAt).toDate(),
                     tags: tags,
                     channel: {
                         thumbnails: channel.snippet.thumbnails,
@@ -292,9 +330,12 @@ class YoutubeParser extends Parser {
                 videoDurationFormatted: '',
                 videoPublishDate:
                     publishedAt !== ''
-                        ? moment(publishedAt, ['MMM D, YYYY', 'MMMM D, YYYY', 'D MMM YYYY', moment.ISO_8601]).format(
-                              this.plugin.settings.dateContentFmt,
-                          )
+                        ? typedMoment(publishedAt, [
+                              'MMM D, YYYY',
+                              'MMMM D, YYYY',
+                              'D MMM YYYY',
+                              typedMoment.ISO_8601,
+                          ]).format(this.plugin.settings.dateContentFmt)
                         : '',
                 videoViewsCount: videoViewsCount,
                 videoTags: '',
@@ -446,7 +487,7 @@ class YoutubeParser extends Parser {
             });
 
             return this.formatVideoTranscript(videoId, this.parseTranscriptSegments(transcriptXml));
-        } catch (error) {
+        } catch {
             // A missing/unavailable transcript should not block note creation.
             return '';
         }

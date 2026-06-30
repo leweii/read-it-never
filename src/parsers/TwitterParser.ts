@@ -3,12 +3,34 @@ import { Parser } from './Parser';
 import { Note } from './Note';
 import { parseHtmlContent } from './parsehtml';
 
-interface TweetNoteData {
+type TweetNoteData = {
     date: string;
     tweetAuthorName: string;
     tweetURL: string;
     tweetContent: string;
     tweetPublishDate: string;
+};
+
+interface TwitterOEmbedResponse {
+    html: string;
+    author_name: string;
+    url: string;
+}
+
+function parseTwitterOEmbedResponse(raw: string): TwitterOEmbedResponse {
+    const value: unknown = JSON.parse(raw);
+
+    if (typeof value !== 'object' || value === null) {
+        return { html: '', author_name: '', url: '' };
+    }
+
+    const candidate = value as Record<string, unknown>;
+
+    return {
+        html: typeof candidate.html === 'string' ? candidate.html : '',
+        author_name: typeof candidate.author_name === 'string' ? candidate.author_name : '',
+        url: typeof candidate.url === 'string' ? candidate.url : '',
+    };
 }
 
 class TwitterParser extends Parser {
@@ -39,7 +61,7 @@ class TwitterParser extends Parser {
     }
 
     private async getTweetNoteData(url: URL, createdAt: Date): Promise<TweetNoteData> {
-        const response = JSON.parse(
+        const response = parseTwitterOEmbedResponse(
             await request({
                 method: 'GET',
                 contentType: 'application/json',

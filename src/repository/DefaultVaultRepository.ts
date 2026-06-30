@@ -63,7 +63,7 @@ export default class DefaultVaultRepository implements VaultRepository {
         } else {
             const newFile = await this.plugin.app.vault.create(note.filePath, note.content);
             if (this.plugin.settings.openNewNote || this.plugin.settings.openNewNoteInNewTab) {
-                this.plugin.app.workspace
+                await this.plugin.app.workspace
                     .getLeaf(this.plugin.settings.openNewNoteInNewTab ? 'tab' : false)
                     .openFile(newFile);
             }

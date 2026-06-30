@@ -36,7 +36,7 @@ interface Status {
     media_attachments: MediaAttachment[];
 }
 
-interface MastodonStatusNoteData {
+type MastodonStatusNoteData = {
     date: string;
     tootContent: string;
     tootURL: string;
@@ -45,6 +45,10 @@ interface MastodonStatusNoteData {
         status: Status;
         replies: Status[];
     };
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
 }
 
 class MastodonParser extends Parser {
@@ -126,7 +130,7 @@ class MastodonParser extends Parser {
 
     private async loadStatus(hostname: string, statusId: string): Promise<Status> {
         try {
-            const response = JSON.parse(
+            const response: unknown = JSON.parse(
                 await request({
                     method: 'GET',
                     contentType: 'application/json',
@@ -134,21 +138,17 @@ class MastodonParser extends Parser {
                 }),
             );
 
-            return response;
+            return response as Status;
         } catch (error) {
-            handleError(error, 'Unable to load Mastodon status.');
+            handleError(error as Error, 'Unable to load Mastodon status.');
         }
     }
 
     private async loadReplies(hostname: string, statusId: string): Promise<Status[]> {
-        const url = String.prototype.concat.call(
-            'https://',
-            hostname,
-            String.prototype.replace.call(MASTODON_API.CONTEXT, '%id%', statusId),
-        );
+        const url = `https://${hostname}${MASTODON_API.CONTEXT.replace('%id%', statusId)}`;
 
         try {
-            const response = JSON.parse(
+            const response: unknown = JSON.parse(
                 await request({
                     method: 'GET',
                     contentType: 'application/json',
@@ -156,7 +156,11 @@ class MastodonParser extends Parser {
                 }),
             );
 
-            return response.descendants;
+            if (isRecord(response) && Array.isArray(response.descendants)) {
+                return response.descendants as Status[];
+            }
+
+            return [];
         } catch (error) {
             console.warn('Unable to load Mastodon replies:', error);
             return [];
@@ -188,7 +192,7 @@ class MastodonParser extends Parser {
         const urlDomain = new URL(url).hostname;
 
         try {
-            const response = JSON.parse(
+            const response: unknown = JSON.parse(
                 await request({
                     method: 'GET',
                     contentType: 'application/json',
@@ -196,8 +200,8 @@ class MastodonParser extends Parser {
                 }),
             );
 
-            return response?.domain === urlDomain;
-        } catch (e) {
+            return isRecord(response) && response.domain === urlDomain;
+        } catch {
             return false;
         }
     }

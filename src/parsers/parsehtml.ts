@@ -1,8 +1,8 @@
 import TurndownService from 'turndown';
 import * as turndownPluginGfm from '@guyplusplus/turndown-plugin-gfm';
 
-export async function parseHtmlContent(content: string) {
-    const gfm = turndownPluginGfm.gfm;
+export function parseHtmlContent(content: string): Promise<string> {
+    const gfm = (turndownPluginGfm as { gfm: TurndownService.Plugin }).gfm;
     const turndownService = new TurndownService({
         headingStyle: 'atx',
         hr: '---',
@@ -76,5 +76,5 @@ export async function parseHtmlContent(content: string) {
 
     const articleContent = turndownService.turndown(content);
 
-    return articleContent;
+    return Promise.resolve(articleContent);
 }

@@ -23,7 +23,7 @@ interface Pin {
     likeCount: number;
 }
 
-interface PinterestNoteData {
+type PinterestNoteData = {
     date: string;
     pinId: string;
     pinURL: string;
@@ -34,6 +34,39 @@ interface PinterestNoteData {
     likeCount: number;
     authorName: string;
     authorProfileURL: string;
+};
+
+interface PinterestPinner {
+    fullName?: string;
+    username?: string;
+}
+
+interface PinterestReactionCount {
+    reactionType?: number;
+    reactionCount?: number;
+}
+
+interface PinterestPinJsonData {
+    title?: string | null;
+    description?: string;
+    link?: string;
+    imageSpec_orig?: { url?: string };
+    originPinner?: PinterestPinner;
+    pinner?: PinterestPinner;
+    reactionCountsData?: PinterestReactionCount[];
+}
+
+interface PinterestRelayResponse {
+    variables?: { isDesktop?: boolean };
+    response?: { data?: { v3GetPinQuery?: { data?: PinterestPinJsonData } } };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+}
+
+function asRelayResponse(value: unknown): PinterestRelayResponse {
+    return isRecord(value) ? (value as PinterestRelayResponse) : {};
 }
 
 export class PinterestParser extends Parser {
@@ -49,7 +82,7 @@ export class PinterestParser extends Parser {
         try {
             pin = await this.parseHtml(clipboardContent);
         } catch (e) {
-            handleError(e, 'Unable to parse Pinterest note data.');
+            handleError(e instanceof Error ? e : new Error(String(e)), 'Unable to parse Pinterest note data.');
         }
 
         const fileName = this.templateEngine.render(this.plugin.settings.pinterestNoteTitle, {
@@ -96,49 +129,49 @@ export class PinterestParser extends Parser {
         const document = new DOMParser().parseFromString(response, 'text/html');
 
         const relayResponseElements = document.querySelectorAll("[data-relay-response='true']");
-        let desktopRelayResponse;
+        let desktopRelayResponse: PinterestRelayResponse | undefined;
         relayResponseElements.forEach((el) => {
-            const jsonData = JSON.parse(el.textContent);
-            if (jsonData?.variables?.isDesktop === true) {
+            const jsonData = asRelayResponse(JSON.parse(el.textContent ?? 'null'));
+            if (jsonData.variables?.isDesktop === true) {
                 desktopRelayResponse = jsonData;
             }
         });
         if (desktopRelayResponse === undefined) {
-            desktopRelayResponse = JSON.parse(relayResponseElements?.[0].textContent) ?? {};
+            desktopRelayResponse = asRelayResponse(JSON.parse(relayResponseElements?.[0]?.textContent ?? 'null'));
         }
 
-        const pinJsonData = desktopRelayResponse?.response?.data?.v3GetPinQuery?.data;
+        const pinJsonData = desktopRelayResponse.response?.data?.v3GetPinQuery?.data;
 
         if (pinJsonData === undefined) {
             throw new Error('pinJsonData is undefined');
         }
 
-        const pinner = pinJsonData?.originPinner ?? pinJsonData?.pinner ?? {};
+        const pinner: PinterestPinner = pinJsonData.originPinner ?? pinJsonData.pinner ?? {};
 
         return {
-            id: url.match(this.PATTERN)[1],
+            id: url.match(this.PATTERN)?.[1] ?? '',
             url: url,
-            title: pinJsonData?.title ?? document.querySelector('h1')?.textContent ?? '',
+            title: pinJsonData.title ?? document.querySelector('h1')?.textContent ?? '',
             description:
-                pinJsonData?.description ??
+                pinJsonData.description ??
                 document.querySelector("[data-test-id='truncated-description'] div div")?.textContent ??
                 '',
             link:
-                pinJsonData?.link ??
+                pinJsonData.link ??
                 document.querySelector("meta[property='pinterestapp:source']")?.getAttribute('content') ??
-                document.querySelector("meta[property='og:see_also']")?.getAttribute('content'),
+                document.querySelector("meta[property='og:see_also']")?.getAttribute('content') ??
+                '',
             image:
-                pinJsonData?.imageSpec_orig?.url ??
+                pinJsonData.imageSpec_orig?.url ??
                 document.querySelector("[data-test-id='pin-closeup-image'] img")?.getAttribute('src') ??
                 '',
             author: {
-                fullName: pinner?.fullName ?? '',
-                username: pinner?.username ?? '',
-                profileURL: `https://www.pinterest.com/${pinner?.username ?? ''}`,
+                fullName: pinner.fullName ?? '',
+                username: pinner.username ?? '',
+                profileURL: `https://www.pinterest.com/${pinner.username ?? ''}`,
             },
             likeCount:
-                pinJsonData?.reactionCountsData?.find((countData: any) => countData?.reactionType === 1)
-                    ?.reactionCount ?? 0,
+                pinJsonData.reactionCountsData?.find((countData) => countData?.reactionType === 1)?.reactionCount ?? 0,
         };
     }
 }

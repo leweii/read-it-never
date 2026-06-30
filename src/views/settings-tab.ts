@@ -25,7 +25,7 @@ enum DetailsItem {
 export class ReadItLaterSettingsTab extends PluginSettingTab {
     plugin: ReadItLaterPlugin;
 
-    private activeDetatils: string[] = [];
+    private activeDetatils: DetailsItem[] = [];
 
     constructor(app: App, plugin: ReadItLaterPlugin) {
         super(app, plugin);
@@ -36,8 +36,6 @@ export class ReadItLaterSettingsTab extends PluginSettingTab {
         const { containerEl } = this;
 
         containerEl.empty();
-
-        new Setting(containerEl).setName('General').setHeading();
 
         new Setting(containerEl)
             .setName('Inbox directory')
@@ -113,9 +111,9 @@ export class ReadItLaterSettingsTab extends PluginSettingTab {
             .setName('Duplicate note filename behavior')
             .setDesc('Applied when note with the same filename already exists')
             .addDropdown((dropdown) => {
-                getFileExistStrategyOptions().forEach((fileExistsStrategyOption) =>
-                    dropdown.addOption(fileExistsStrategyOption.option, fileExistsStrategyOption.label),
-                );
+                getFileExistStrategyOptions().forEach((fileExistsStrategyOption) => {
+                    dropdown.addOption(fileExistsStrategyOption.option, fileExistsStrategyOption.label);
+                });
 
                 dropdown.setValue(this.plugin.settings.fileExistsStrategy || DEFAULT_SETTINGS.fileExistsStrategy);
 
@@ -129,9 +127,9 @@ export class ReadItLaterSettingsTab extends PluginSettingTab {
             .setName('Batch note creation delimiter')
             .setDesc('Delimiter for batch list of notes')
             .addDropdown((dropdown) => {
-                getDelimiterOptions().forEach((delimiterOption) =>
-                    dropdown.addOption(delimiterOption.option, delimiterOption.label),
-                );
+                getDelimiterOptions().forEach((delimiterOption) => {
+                    dropdown.addOption(delimiterOption.option, delimiterOption.label);
+                });
 
                 dropdown.setValue(this.plugin.settings.batchProcessDelimiter || DEFAULT_SETTINGS.batchProcessDelimiter);
 
@@ -1384,7 +1382,7 @@ export class ReadItLaterSettingsTab extends PluginSettingTab {
         return details;
     }
 
-    private createTemplateVariableReferenceDiv(prepend: string = ''): DocumentFragment {
+    private createTemplateVariableReferenceDiv(prepend = ''): DocumentFragment {
         return createHTMLDiv(
             `<p>${prepend} See the <a href="https://github.com/DominikPieper/obsidian-ReadItLater?tab=readme-ov-file#template-engine">template variables reference</a></p>`,
         );

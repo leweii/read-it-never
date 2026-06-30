@@ -19,7 +19,7 @@ interface VideoObject extends Schema {
     url?: string;
 }
 
-interface VimeoNoteData {
+type VimeoNoteData = {
     date: string;
     videoId: string;
     videoTitle: string;
@@ -27,7 +27,7 @@ interface VimeoNoteData {
     videoPlayer: string;
     channelName: string;
     channelURL: string;
-}
+};
 
 class VimeoParser extends Parser {
     private PATTERN = /(vimeo.com)\/(\d+)?/;
@@ -76,7 +76,7 @@ class VimeoParser extends Parser {
                 throw new Error('Vimeo ld+json schema element not found');
             }
 
-            const schema: [VideoObject, Schema] = JSON.parse(schemaElement.textContent);
+            const schema = JSON.parse(schemaElement.textContent) as [VideoObject, Schema];
             const videoSchema = schema[0];
             const videoIdRegexExec = this.PATTERN.exec(url);
 

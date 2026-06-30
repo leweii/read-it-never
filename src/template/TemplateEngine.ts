@@ -1,10 +1,10 @@
 import { lexify } from 'src/helpers/numberUtils';
 
 interface TemplateData {
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
-type ModifierFunction = (value: any, ...args: any[]) => any;
+type ModifierFunction = (value: unknown, ...args: unknown[]) => unknown;
 
 interface Modifiers {
     [key: string]: ModifierFunction;
@@ -18,65 +18,65 @@ export default class TemplateEngine {
 
     constructor() {
         this.modifiers = {
-            blockquote: (value: string) => {
+            blockquote: (value: unknown) => {
                 if (!this.validateFilterValueType(value, 'blockquote', stringableTypes)) {
                     return value;
                 }
-                return value
+                return String(value)
                     .split('\n')
                     .map((line) => `> ${line}`)
                     .join('\n');
             },
-            capitalize: (value: string) => {
+            capitalize: (value: unknown) => {
                 if (!this.validateFilterValueType(value, 'capitalize', stringableTypes)) {
                     return value;
                 }
                 const str = String(value);
                 return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
             },
-            join: (value: any[], separator: string = ',') => {
+            join: (value: unknown, separator: unknown = ',') => {
                 if (!this.validateFilterValueType(value, 'join', ['array'])) {
                     return value;
                 }
-                return value.join(separator);
+                return (value as unknown[]).join(String(separator));
             },
-            numberLexify: (value: number) => {
-                return lexify(value);
+            numberLexify: (value: unknown) => {
+                return lexify(value as number);
             },
-            lower: (value: string) => {
+            lower: (value: unknown) => {
                 if (!this.validateFilterValueType(value, 'lower', stringableTypes)) {
                     return value;
                 }
                 String(value).toLowerCase();
             },
-            map: (value: any[], transform: (item: any) => any) => {
+            map: (value: unknown, transform: unknown) => {
                 if (!this.validateFilterValueType(value, 'map', ['array'])) {
                     return value;
                 }
                 try {
-                    return value.map(transform);
+                    return (value as unknown[]).map(transform as (item: unknown) => unknown);
                 } catch (e) {
                     console.warn('Error in map modifier:', e);
                     return value;
                 }
             },
-            replace: (value: string, search: string, replacement: string = '') => {
+            replace: (value: unknown, search: unknown, replacement: unknown = '') => {
                 if (!this.validateFilterValueType(value, 'replace', stringableTypes)) {
                     return value;
                 }
-                return value.replaceAll(search, replacement);
+                return String(value).replaceAll(String(search), String(replacement));
             },
-            striptags: (value: string, allowedTags: string = '') => {
+            striptags: (value: unknown, allowedTags: unknown = '') => {
                 if (!this.validateFilterValueType(value, 'striptags', stringableTypes)) {
                     return value;
                 }
                 const regex = new RegExp(
-                    `<(?!/?(${allowedTags.replace(/[<>]/g, '').split(',').join('|')})s*/?)[^>]+>`,
+                    `<(?!/?(${String(allowedTags).replace(/[<>]/g, '').split(',').join('|')})s*/?)[^>]+>`,
                     'gi',
                 );
-                return value.replace(regex, '');
+                return String(value).replace(regex, '');
             },
-            upper: (value: string) => {
+            upper: (value: unknown) => {
                 if (!this.validateFilterValueType(value, 'upper', stringableTypes)) {
                     return value;
                 }
@@ -132,7 +132,7 @@ export default class TemplateEngine {
                 const rawStringRegex = /(['"])((?:[^\\]|\\.)*?)\1/;
                 const rawStringMatch = rawStringRegex.exec(key);
 
-                let value;
+                let value: unknown;
 
                 // if value is raw string don't resolve value from template data
                 if (rawStringMatch !== null) {
@@ -146,7 +146,7 @@ export default class TemplateEngine {
                     return match;
                 }
 
-                let processedValue = value;
+                let processedValue: unknown = value;
                 for (const modifier of modifiers) {
                     processedValue = this.applyModifier(processedValue, modifier);
                 }
@@ -171,8 +171,8 @@ export default class TemplateEngine {
                 }
 
                 return arrayValue
-                    .map((item: any) => {
-                        const loopContext = { ...data, [itemName]: item };
+                    .map((item: unknown) => {
+                        const loopContext: TemplateData = { ...data, [itemName]: item };
                         return this.render(content, loopContext);
                     })
                     .join('');
@@ -183,13 +183,13 @@ export default class TemplateEngine {
         });
     }
 
-    private resolveValue(path: string, data: TemplateData): any {
+    private resolveValue(path: string, data: TemplateData): unknown {
         const parts = path.trim().split('.');
-        let value = data;
+        let value: unknown = data;
 
         for (const part of parts) {
             if (value === undefined || value === null) return undefined;
-            value = value[part];
+            value = (value as Record<string, unknown>)[part];
         }
 
         return value;
@@ -202,7 +202,7 @@ export default class TemplateEngine {
         this.modifiers[name] = func;
     }
 
-    private parseModifier(modifierString: string): { name: string; args: any[] } {
+    private parseModifier(modifierString: string): { name: string; args: unknown[] } {
         const match = modifierString.match(/(\w+)(?:\((.*?)\))?/);
         if (!match) return { name: modifierString, args: [] };
 
@@ -211,8 +211,8 @@ export default class TemplateEngine {
         return { name, args };
     }
 
-    private parseArguments(argsString: string): any[] {
-        const args: any[] = [];
+    private parseArguments(argsString: string): unknown[] {
+        const args: unknown[] = [];
         let current = '';
         let inQuotes = false;
         let quoteChar = '';
@@ -291,7 +291,7 @@ export default class TemplateEngine {
         return args;
     }
 
-    private evaluateArgument(arg: string): any {
+    private evaluateArgument(arg: string): unknown {
         try {
             // Handle quoted strings
             if ((arg.startsWith('"') && arg.endsWith('"')) || (arg.startsWith("'") && arg.endsWith("'"))) {
@@ -311,8 +311,8 @@ export default class TemplateEngine {
             // Handle arrays
             if (arg.startsWith('[') && arg.endsWith(']')) {
                 try {
-                    return JSON.parse(arg);
-                } catch (e) {
+                    return JSON.parse(arg) as unknown;
+                } catch {
                     return arg;
                 }
             }
@@ -324,7 +324,7 @@ export default class TemplateEngine {
         }
     }
 
-    private applyModifier(value: any, modifierString: string): any {
+    private applyModifier(value: unknown, modifierString: string): unknown {
         try {
             const { name, args } = this.parseModifier(modifierString);
             if (this.modifiers[name]) {
@@ -338,7 +338,7 @@ export default class TemplateEngine {
         }
     }
 
-    private validateFilterValueType(value: any, filter: string, supportedTypes: string[]): boolean {
+    private validateFilterValueType(value: unknown, filter: string, supportedTypes: string[]): boolean {
         const valueType = typeof value;
 
         if (supportedTypes.includes(valueType)) {

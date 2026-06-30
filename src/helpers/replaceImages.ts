@@ -21,7 +21,7 @@ export async function replaceImages(
     return await replaceAsync(content, EXTERNAL_MEDIA_LINK_PATTERN, imageTagProcessor(plugin, noteFileName, assetsDir));
 }
 
-async function replaceAsync(content: string, searchValue: string | RegExp, replacer: Replacer) {
+async function replaceAsync(content: string, searchValue: string | RegExp, replacer: Replacer): Promise<string> {
     try {
         if (typeof replacer === 'function') {
             // 1. Run fake pass of `replace`, collect values from `replacer` calls
@@ -34,15 +34,15 @@ async function replaceAsync(content: string, searchValue: string | RegExp, repla
             });
             return Promise.all(values).then(function (resolvedValues) {
                 return String.prototype.replace.call(content, searchValue, function () {
-                    return resolvedValues.shift();
-                });
+                    return resolvedValues.shift() ?? '';
+                }) as string;
             });
         } else {
-            return Promise.resolve(String.prototype.replace.call(content, searchValue, replacer));
+            return Promise.resolve(String.prototype.replace.call(content, searchValue, replacer) as string);
         }
     } catch (error) {
         console.error();
-        return Promise.reject(error);
+        return Promise.reject(error instanceof Error ? error : new Error(String(error)));
     }
 }
 

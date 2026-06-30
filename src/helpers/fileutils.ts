@@ -11,7 +11,7 @@ export function isValidUrl(url: string, allowedProtocols: string[] = []): boolea
     let urlObject;
     try {
         urlObject = new URL(url);
-    } catch (e) {
+    } catch {
         return false;
     }
 
@@ -27,7 +27,7 @@ export function getBaseUrl(url: string, origin: string): string {
     return baseURL.href;
 }
 
-export function normalizeFilename(fileName: string, preserveUnicode: boolean = true): string {
+export function normalizeFilename(fileName: string, preserveUnicode = true): string {
     if (preserveUnicode) {
         return fileName.replace(/[:#/\\|?*<>"]/g, '');
     }

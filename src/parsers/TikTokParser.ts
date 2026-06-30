@@ -3,7 +3,7 @@ import { handleError } from 'src/helpers/error';
 import { Note } from './Note';
 import { Parser } from './Parser';
 
-interface TiktokNoteData {
+type TiktokNoteData = {
     date: string;
     videoId: string;
     videoURL: string;
@@ -11,7 +11,7 @@ interface TiktokNoteData {
     videoPlayer: string;
     authorName: string;
     authorURL: string;
-}
+};
 
 class TikTokParser extends Parser {
     private PATTERN = /(tiktok.com)\/(\S+)\/(video)\/(\d+)/;

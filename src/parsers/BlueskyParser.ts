@@ -49,6 +49,91 @@ enum FacetType {
     Tag = 'tag',
 }
 
+// Shapes of the Bluesky AT-protocol API responses, limited to the fields actually consumed.
+interface ApiAuthor {
+    did: string;
+    displayName?: string;
+    handle: string;
+    avatar?: string;
+}
+
+interface ApiFacetFeature {
+    $type: string;
+    did?: string;
+    uri?: string;
+    tag?: string;
+}
+
+interface ApiFacet {
+    features?: ApiFacetFeature[];
+    index: {
+        byteStart: number;
+        byteEnd: number;
+    };
+}
+
+interface ApiRecord {
+    text: string;
+    createdAt: string;
+    facets?: ApiFacet[];
+}
+
+interface ApiImage {
+    fullsize: string;
+    thumb: string;
+    alt: string;
+}
+
+interface ApiExternal {
+    uri: string;
+    thumb: string;
+    title?: string;
+    description?: string;
+}
+
+interface ApiRecordValue {
+    text: string;
+}
+
+interface ApiEmbedRecord {
+    uri: string;
+    author?: ApiAuthor;
+    value: ApiRecordValue;
+    record?: ApiEmbed;
+}
+
+interface ApiEmbed {
+    $type?: string;
+    images?: ApiImage[];
+    thumbnail?: string;
+    external?: ApiExternal;
+    record?: ApiEmbedRecord;
+    media?: ApiEmbed;
+    uri?: string;
+    author?: ApiAuthor;
+    value?: ApiRecordValue;
+}
+
+interface ApiPost {
+    uri: string;
+    author: ApiAuthor;
+    record: ApiRecord;
+    embed?: ApiEmbed;
+    likeCount: number;
+    replyCount: number;
+    repostCount: number;
+    quoteCount?: number;
+}
+
+interface ApiThread {
+    post: ApiPost;
+    replies?: ApiThread[];
+}
+
+interface GetPostThreadResponse {
+    thread: ApiThread;
+}
+
 interface PostId {
     handle: string;
     id: string;
@@ -71,9 +156,9 @@ interface Embed {
 
 interface Author {
     did: string;
-    displayName: string;
+    displayName?: string;
     handle: string;
-    avatar: string;
+    avatar?: string;
 }
 
 interface PostData {
@@ -93,9 +178,9 @@ interface Post extends PostData {
     replies: PostReply[];
 }
 
-interface PostReply extends PostData {}
+type PostReply = PostData;
 
-interface BlueskyNoteData {
+type BlueskyNoteData = {
     date: string;
     content: string;
     postURL: string;
@@ -109,7 +194,7 @@ interface BlueskyNoteData {
     extra: {
         post: PostData;
     };
-}
+};
 
 export class BlueskyParser extends Parser {
     private PATTERN = /^https:\/\/bsky\.app\/profile\/(?<handle>[a-zA-Z0-9-.:]+)\/post\/(?<postId>[a-zA-Z0-9]+)/;
@@ -138,7 +223,7 @@ export class BlueskyParser extends Parser {
         const fileName = this.templateEngine.render(this.plugin.settings.blueskyNoteTitle, {
             date: this.getFormattedDateForFilename(createdAt),
             authorHandle: post.author.handle,
-            authorName: normalizeFilename(post.author.displayName, false),
+            authorName: normalizeFilename(post.author.displayName ?? '', false),
         });
 
         if (this.plugin.settings.downloadBlueskyEmbeds) {
@@ -173,34 +258,32 @@ export class BlueskyParser extends Parser {
         try {
             const postUri = this.getPostUri(this.getPostIdFromUrl(postUrl));
 
-            const response: any = JSON.parse(
+            const response = JSON.parse(
                 await request({
                     method: 'GET',
                     contentType: 'application/json',
                     url: `https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=${postUri}`,
                 }),
-            );
+            ) as GetPostThreadResponse;
 
             const replies: PostReply[] = [];
 
-            response.thread.replies.forEach((reply: any) => {
+            (response.thread.replies ?? []).forEach((reply) => {
                 const replyPostUrl = this.getPostUrl(this.getPostIdFromAtUri(reply.post.uri));
                 replies.push({
                     url: replyPostUrl,
                     content: reply.post.record.text,
                     author: { ...reply.post.author },
-                    embeds: Object.prototype.hasOwnProperty.call(reply.post, 'embed')
-                        ? this.makeEmbeds(reply.post.embed, replyPostUrl)
-                        : [],
+                    embeds:
+                        Object.prototype.hasOwnProperty.call(reply.post, 'embed') && reply.post.embed
+                            ? this.makeEmbeds(reply.post.embed, replyPostUrl)
+                            : [],
                     likeCount: reply.post.likeCount,
                     replyCount: reply.post.replyCount,
                     repostCount: reply.post.repostCount,
                     quoteCount: reply.post.replyCount,
                     publishedAt: moment(reply.post.record.createdAt).toDate(),
-                    facets:
-                        reply.post.record?.facets?.map((facet: any) => {
-                            return this.makeFacet(facet);
-                        }) ?? [],
+                    facets: reply.post.record?.facets?.map((facet) => this.makeFacet(facet)) ?? [],
                 });
             });
 
@@ -208,32 +291,33 @@ export class BlueskyParser extends Parser {
                 url: postUrl,
                 content: response.thread.post.record.text,
                 author: { ...response.thread.post.author },
-                embeds: Object.prototype.hasOwnProperty.call(response.thread.post, 'embed')
-                    ? this.makeEmbeds(response.thread.post.embed, postUrl)
-                    : [],
+                embeds:
+                    Object.prototype.hasOwnProperty.call(response.thread.post, 'embed') && response.thread.post.embed
+                        ? this.makeEmbeds(response.thread.post.embed, postUrl)
+                        : [],
                 likeCount: response.thread.post.likeCount,
                 replyCount: response.thread.post.replyCount,
                 repostCount: response.thread.post.repostCount,
                 quoteCount: response.thread.post.replyCount,
                 publishedAt: moment(response.thread.post.record.createdAt).toDate(),
-                facets:
-                    response.thread.post.record?.facets?.map((facet: any) => {
-                        return this.makeFacet(facet);
-                    }) ?? [],
+                facets: response.thread.post.record?.facets?.map((facet) => this.makeFacet(facet)) ?? [],
                 replies: replies,
             };
         } catch (error) {
-            handleError(error, 'Unable to parse Bluesky API response.');
+            handleError(
+                error instanceof Error ? error : new Error(String(error)),
+                'Unable to parse Bluesky API response.',
+            );
         }
     }
 
-    private makeEmbeds(responseEmbed: any, postUrl: string): Embed[] {
+    private makeEmbeds(responseEmbed: ApiEmbed, postUrl: string): Embed[] {
         const embeds: Embed[] = [];
         const embedTypeApi = responseEmbed.$type as EmbedTypeApi;
 
         switch (embedTypeApi) {
             case EmbedTypeApi.Image:
-                responseEmbed.images.forEach((image: any) => {
+                (responseEmbed.images ?? []).forEach((image) => {
                     embeds.push({
                         type: EmbedType.Image,
                         url: image.fullsize,
@@ -247,48 +331,52 @@ export class BlueskyParser extends Parser {
                 embeds.push({
                     type: EmbedType.Video,
                     url: postUrl,
-                    thumbnail: responseEmbed.thumbnail,
+                    thumbnail: responseEmbed.thumbnail ?? '',
                     title: '',
                     description: '',
                 });
                 break;
             case EmbedTypeApi.External:
-                embeds.push({
-                    type: EmbedType.External,
-                    url: responseEmbed.external.uri,
-                    thumbnail: responseEmbed.external.thumb,
-                    title: responseEmbed.external?.title || '',
-                    description: responseEmbed.external.description || '',
-                });
+                if (responseEmbed.external) {
+                    embeds.push({
+                        type: EmbedType.External,
+                        url: responseEmbed.external.uri,
+                        thumbnail: responseEmbed.external.thumb,
+                        title: responseEmbed.external?.title || '',
+                        description: responseEmbed.external.description || '',
+                    });
+                }
                 break;
             case EmbedTypeApi.Record:
-                embeds.push({
-                    type: EmbedType.Record,
-                    url: this.getPostUrl(this.getPostIdFromAtUri(responseEmbed.record.uri)),
-                    thumbnail: '',
-                    title: `Post from ${
-                        responseEmbed.record.author?.displayName || responseEmbed.record.author.handle
-                    }`,
-                    description: responseEmbed.record.value.text,
-                });
+                if (responseEmbed.record) {
+                    embeds.push({
+                        type: EmbedType.Record,
+                        url: this.getPostUrl(this.getPostIdFromAtUri(responseEmbed.record.uri)),
+                        thumbnail: '',
+                        title: `Post from ${
+                            responseEmbed.record.author?.displayName || responseEmbed.record.author?.handle || ''
+                        }`,
+                        description: responseEmbed.record.value.text,
+                    });
+                }
                 break;
             case EmbedTypeApi.RecordView:
                 embeds.push({
                     type: EmbedType.Record,
-                    url: this.getPostUrl(this.getPostIdFromAtUri(responseEmbed.uri)),
+                    url: this.getPostUrl(this.getPostIdFromAtUri(responseEmbed.uri ?? '')),
                     thumbnail: '',
-                    title: `Post from ${responseEmbed.author?.displayName || responseEmbed.author.handle}`,
-                    description: responseEmbed.value.text,
+                    title: `Post from ${responseEmbed.author?.displayName || responseEmbed.author?.handle || ''}`,
+                    description: responseEmbed.value?.text ?? '',
                 });
                 break;
             case EmbedTypeApi.RecordWithMedia:
-                if (Object.prototype.hasOwnProperty.call(responseEmbed, 'media')) {
+                if (Object.prototype.hasOwnProperty.call(responseEmbed, 'media') && responseEmbed.media) {
                     const mediaEmbeds = this.makeEmbeds(responseEmbed.media, postUrl);
                     if (mediaEmbeds) {
                         embeds.push(...mediaEmbeds);
                     }
                 }
-                if (Object.prototype.hasOwnProperty.call(responseEmbed, 'record')) {
+                if (Object.prototype.hasOwnProperty.call(responseEmbed, 'record') && responseEmbed.record?.record) {
                     const recordEmbeds = this.makeEmbeds(responseEmbed.record.record, postUrl);
                     if (recordEmbeds) {
                         embeds.push(...recordEmbeds);
@@ -300,32 +388,32 @@ export class BlueskyParser extends Parser {
         return embeds;
     }
 
-    private makeFacet(facetResponse: any): Facet {
+    private makeFacet(facetResponse: ApiFacet): Facet {
         switch (facetResponse.features?.[0].$type) {
             case FacetTypeApi.Mention:
                 return {
                     type: FacetType.Mention,
-                    did: facetResponse.features?.[0].did,
+                    did: facetResponse.features?.[0].did ?? '',
                     byteStart: facetResponse.index.byteStart,
                     byteEnd: facetResponse.index.byteEnd,
                 };
             case FacetTypeApi.Link:
                 return {
                     type: FacetType.Link,
-                    uri: facetResponse.features?.[0].uri,
+                    uri: facetResponse.features?.[0].uri ?? '',
                     byteStart: facetResponse.index.byteStart,
                     byteEnd: facetResponse.index.byteEnd,
                 };
             case FacetTypeApi.Tag:
                 return {
                     type: FacetType.Tag,
-                    tag: facetResponse.features?.[0].tag,
+                    tag: facetResponse.features?.[0].tag ?? '',
                     byteStart: facetResponse.index.byteStart,
                     byteEnd: facetResponse.index.byteEnd,
                 };
         }
 
-        throw new Error(`Unrecognized facet type ${facetResponse}`);
+        throw new Error(`Unrecognized facet type ${JSON.stringify(facetResponse)}`);
     }
 
     private formatPostContent(post: PostData, createdAt: Date, template: string): string {

@@ -21,7 +21,7 @@ export class NoteService {
             await this.repository.saveNote(note);
         } catch (error) {
             if (error instanceof FileExistsError) {
-                this.handleFileExistsError([note]);
+                void this.handleFileExistsError([note]);
             }
         }
     }
@@ -42,7 +42,7 @@ export class NoteService {
         }
 
         if (existingNotes.length > 0) {
-            this.handleFileExistsError(existingNotes);
+            void this.handleFileExistsError(existingNotes);
         }
     }
 
@@ -56,7 +56,8 @@ export class NoteService {
             const parser = await this.parserCreator.createParser(content);
             return await parser.prepareNote(content);
         } catch (error) {
-            new Notice(`Read It Never: Failed to process content. ${error.message}`);
+            const message = error instanceof Error ? error.message : String(error);
+            new Notice(`Read It Never: Failed to process content. ${message}`);
             throw error;
         }
     }
@@ -65,7 +66,7 @@ export class NoteService {
         if (this.plugin.settings.openNewNote || this.plugin.settings.openNewNoteInNewTab) {
             try {
                 const file = this.repository.getFileByPath(note.filePath);
-                this.plugin.app.workspace
+                void this.plugin.app.workspace
                     .getLeaf(this.plugin.settings.openNewNoteInNewTab ? 'tab' : false)
                     .openFile(file);
             } catch (error) {
@@ -75,7 +76,7 @@ export class NoteService {
         }
     }
 
-    private async handleFileExistsError(notes: Note[]): Promise<void> {
+    private handleFileExistsError(notes: Note[]): void {
         switch (this.plugin.settings.fileExistsStrategy) {
             case FileExistsStrategy.Ask:
                 new FileExistsAsk(this.plugin.app, notes, (strategy, doNotAskAgain) => {
@@ -86,27 +87,23 @@ export class NoteService {
                 this.handleFileExistsStrategyNothing(notes);
                 break;
             case FileExistsStrategy.AppendToExisting:
-                this.handleFileExistsStrategyAppend(notes);
+                void this.handleFileExistsStrategyAppend(notes);
                 break;
         }
     }
 
-    private async handleFileAskModalResponse(
-        strategy: FileExistsStrategy,
-        doNotAskAgain: boolean,
-        notes: Note[],
-    ): Promise<void> {
+    private handleFileAskModalResponse(strategy: FileExistsStrategy, doNotAskAgain: boolean, notes: Note[]): void {
         switch (strategy) {
             case FileExistsStrategy.Nothing:
                 this.handleFileExistsStrategyNothing(notes);
                 break;
             case FileExistsStrategy.AppendToExisting:
-                this.handleFileExistsStrategyAppend(notes);
+                void this.handleFileExistsStrategyAppend(notes);
                 break;
         }
 
         if (doNotAskAgain) {
-            this.plugin.saveSetting('fileExistsStrategy', strategy as FileExistsStrategy);
+            void this.plugin.saveSetting('fileExistsStrategy', strategy);
         }
 
         if (notes.length === 1) {

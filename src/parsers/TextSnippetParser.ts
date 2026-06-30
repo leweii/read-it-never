@@ -6,7 +6,7 @@ class TextSnippetParser extends Parser {
         return true;
     }
 
-    async prepareNote(text: string): Promise<Note> {
+    prepareNote(text: string): Promise<Note> {
         const createdAt = new Date();
 
         const fileNameTemplate = this.templateEngine.render(this.plugin.settings.textSnippetNoteTitle, {
@@ -17,7 +17,9 @@ class TextSnippetParser extends Parser {
             content: text,
             date: this.getFormattedDateForContent(createdAt),
         });
-        return new Note(fileNameTemplate, 'md', content, this.plugin.settings.textSnippetContentType, createdAt);
+        return Promise.resolve(
+            new Note(fileNameTemplate, 'md', content, this.plugin.settings.textSnippetContentType, createdAt),
+        );
     }
 }
 

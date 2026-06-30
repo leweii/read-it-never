@@ -26,7 +26,7 @@ interface StackExchangeUser {
     profile: string;
 }
 
-interface StackExchangeNoteData {
+type StackExchangeNoteData = {
     date: string;
     questionTitle: string;
     questionURL: string;
@@ -38,7 +38,7 @@ interface StackExchangeNoteData {
     extra: {
         question: StackExchangeQuestion;
     };
-}
+};
 
 class StackExchangeParser extends Parser {
     private PATTERN =
@@ -145,7 +145,7 @@ class StackExchangeParser extends Parser {
                 document.querySelector('link[rel="canonical"]')?.getAttribute('href') ??
                     document.querySelector('meta[property="og:url"]')?.getAttribute('content'),
             );
-        } catch (e) {
+        } catch {
             questionURL = null;
         }
 
@@ -160,7 +160,7 @@ class StackExchangeParser extends Parser {
                 author: {
                     name: answerAuthor?.querySelector('[itemprop="name"]')?.textContent ?? '',
                     profile:
-                        answerAuthor instanceof Element && questionURL instanceof URL
+                        answerAuthor?.instanceOf(Element) && questionURL instanceof URL
                             ? String.prototype.concat(
                                   questionURL.origin,
                                   answerAuthor.querySelector('a')?.getAttribute('href') ?? '',
@@ -181,7 +181,7 @@ class StackExchangeParser extends Parser {
             author: {
                 name: author?.querySelector('[itemprop="name"]')?.textContent ?? '',
                 profile:
-                    author instanceof Element && questionURL instanceof URL
+                    author?.instanceOf(Element) && questionURL instanceof URL
                         ? String.prototype.concat(
                               questionURL.origin,
                               author.querySelector('a')?.getAttribute('href') ?? '',

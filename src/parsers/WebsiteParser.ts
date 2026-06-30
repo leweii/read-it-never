@@ -21,7 +21,7 @@ interface ReadabilityArticle {
     publishedTime: string;
 }
 
-interface WebsiteNoteData {
+type WebsiteNoteData = {
     date: string;
     articleTitle: string;
     articleURL: string;
@@ -35,7 +35,7 @@ interface WebsiteNoteData {
     articleOgDescription: string;
     articleMetaAuthor: string;
     articlePublishedTime: string;
-}
+};
 
 class WebsiteParser extends Parser {
     test(url: string): boolean {

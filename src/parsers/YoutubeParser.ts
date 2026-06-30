@@ -11,16 +11,16 @@ import { Parser } from './Parser';
 const YOUTUBE_INNERTUBE_API_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
 const YOUTUBE_IOS_USER_AGENT = 'com.google.ios.youtube/20.10.38 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)';
 
-interface YoutubeNoteData {
+type YoutubeNoteData = {
     date: string;
     videoId: string;
     videoTitle: string;
     videoDescription: string;
     videoThumbnail: string;
-    videoDuration: Number;
+    videoDuration: number;
     videoDurationFormatted: string;
     videoPublishDate: string;
-    videoViewsCount: Number;
+    videoViewsCount: number | string;
     videoURL: string;
     videoTags: string;
     videoPlayer: string;
@@ -30,7 +30,7 @@ interface YoutubeNoteData {
     channelName: string;
     channelURL: string;
     extra: YoutubeVideo;
-}
+};
 
 interface YoutubeVideo {
     thumbnails: GoogleApiYouTubeThumbnailResource;
@@ -59,6 +59,77 @@ interface YoutubeCaptionTrack {
 
 interface YoutubeChannel {
     thumbnails: GoogleApiYouTubeThumbnailResource;
+}
+
+// Shape of the YouTube Data API v3 list responses (videos/channels) actually consumed below.
+interface YoutubeApiVideoListResponse {
+    items: GoogleApiYouTubeVideoResource[];
+}
+
+interface YoutubeApiChannelListResponse {
+    items: GoogleApiYouTubeChannelResource[];
+}
+
+// Shape of the InnerTube `player` endpoint response fields consumed in `getVideoTranscript`.
+interface YoutubeInnerTubePlayerResponse {
+    captions?: {
+        playerCaptionsTracklistRenderer?: {
+            captionTracks?: YoutubeCaptionTrack[];
+        };
+    };
+}
+
+// Minimal shape of the `ytInitialData` blob fields read in `parseSchema`. Every level is optional
+// because the structure varies between videos and across YouTube layout changes.
+interface YoutubeInitialData {
+    contents?: {
+        twoColumnWatchNextResults?: {
+            results?: {
+                results?: {
+                    contents?: YoutubeWatchNextContent[];
+                };
+            };
+        };
+    };
+    engagementPanels?: YoutubeEngagementPanel[];
+}
+
+interface YoutubeWatchNextContent {
+    videoPrimaryInfoRenderer?: {
+        viewCount?: {
+            videoViewCountRenderer?: {
+                originalViewCount?: string;
+            };
+        };
+    };
+    videoSecondaryInfoRenderer?: {
+        attributedDescription?: {
+            content?: string;
+        };
+        subscribeButton?: {
+            subscribeButtonRenderer?: {
+                channelId?: string;
+            };
+        };
+    };
+}
+
+interface YoutubeEngagementPanel {
+    engagementPanelSectionListRenderer?: {
+        content?: {
+            structuredDescriptionContentRenderer?: {
+                items?: YoutubeStructuredDescriptionItem[];
+            };
+        };
+    };
+}
+
+interface YoutubeStructuredDescriptionItem {
+    videoDescriptionHeaderRenderer?: {
+        publishDate?: {
+            simpleText?: string;
+        };
+    };
 }
 
 class YoutubeParser extends Parser {
@@ -97,7 +168,7 @@ class YoutubeParser extends Parser {
                 },
             });
 
-            const videoJsonResponse = JSON.parse(videoApiResponse);
+            const videoJsonResponse = JSON.parse(videoApiResponse) as YoutubeApiVideoListResponse;
             if (videoJsonResponse.items.length === 0) {
                 throw new Error(`Video (${url}) cannot be fetched from API`);
             }
@@ -110,7 +181,7 @@ class YoutubeParser extends Parser {
                     Accept: 'application/json',
                 },
             });
-            const channelJsonResponse = JSON.parse(channelApiResponse);
+            const channelJsonResponse = JSON.parse(channelApiResponse) as YoutubeApiChannelListResponse;
             if (channelJsonResponse.items.length === 0) {
                 throw new Error(`Channel (${video.snippet.channelId}) cannot be fetched from API`);
             }
@@ -158,7 +229,10 @@ class YoutubeParser extends Parser {
                 },
             };
         } catch (error) {
-            handleError(error, 'Unable to parse Youtube API response.');
+            handleError(
+                error instanceof Error ? error : new Error(String(error)),
+                'Unable to parse Youtube API response.',
+            );
         }
     }
 
@@ -173,7 +247,8 @@ class YoutubeParser extends Parser {
             const videoHTML = new DOMParser().parseFromString(response, 'text/html');
 
             const declaration = getJavascriptDeclarationByName('ytInitialData', videoHTML.querySelectorAll('script'));
-            const jsonData = typeof declaration !== 'undefined' ? JSON.parse(declaration.value) : {};
+            const jsonData: YoutubeInitialData =
+                typeof declaration !== 'undefined' ? (JSON.parse(declaration.value) as YoutubeInitialData) : {};
 
             const videoSchemaElement = videoHTML.querySelector('[itemtype*="http://schema.org/VideoObject"]');
 
@@ -231,12 +306,15 @@ class YoutubeParser extends Parser {
                 extra: null,
             };
         } catch (error) {
-            handleError(error, 'Unable to parse Youtube schema from DOM.');
+            handleError(
+                error instanceof Error ? error : new Error(String(error)),
+                'Unable to parse Youtube schema from DOM.',
+            );
         }
     }
 
     private formatDuration(duration: Duration): string {
-        let formatted: string = '';
+        let formatted = '';
 
         if (duration.years > 0) {
             formatted = formatted.concat(' ', `${duration.years}y`);
@@ -347,7 +425,7 @@ class YoutubeParser extends Parser {
                         videoId,
                     }),
                 }),
-            );
+            ) as YoutubeInnerTubePlayerResponse;
 
             const captionTracks: YoutubeCaptionTrack[] =
                 playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
@@ -435,8 +513,8 @@ class YoutubeParser extends Parser {
             .replace(/&quot;/g, '"')
             .replace(/&#39;/g, "'")
             .replace(/&apos;/g, "'")
-            .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
-            .replace(/&#x([a-fA-F0-9]+);/g, (_, code) => String.fromCharCode(parseInt(code, 16)));
+            .replace(/&#(\d+);/g, (_match: string, code: string) => String.fromCharCode(parseInt(code, 10)))
+            .replace(/&#x([a-fA-F0-9]+);/g, (_match: string, code: string) => String.fromCharCode(parseInt(code, 16)));
     }
 
     private getEmbedPlayer(videoId: string): string {

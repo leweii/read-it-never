@@ -1,18 +1,19 @@
 import { Note } from 'src/parsers/Note';
 import { CapacitorAdapter, FileSystemAdapter, Notice, TFile, TFolder, normalizePath } from 'obsidian';
-import ReadItLaterPlugin from 'src/main';
+import ReadItNeverPlugin from 'src/main';
 import { getOsOptimizedPath } from 'src/helpers/fileutils';
 import TemplateEngine from 'src/template/TemplateEngine';
 import { formatDate } from 'src/helpers/date';
+import { t } from 'src/i18n';
 import FileNotFoundError from 'src/error/FileNotFound';
 import FileExistsError from '../error/FileExists';
 import { VaultRepository } from './VaultRepository';
 
 export default class DefaultVaultRepository implements VaultRepository {
-    private plugin: ReadItLaterPlugin;
+    private plugin: ReadItNeverPlugin;
     private templateEngine: TemplateEngine;
 
-    constructor(plugin: ReadItLaterPlugin, templateEngine: TemplateEngine) {
+    constructor(plugin: ReadItNeverPlugin, templateEngine: TemplateEngine) {
         this.plugin = plugin;
         this.templateEngine = templateEngine;
     }
@@ -67,7 +68,7 @@ export default class DefaultVaultRepository implements VaultRepository {
                     .getLeaf(this.plugin.settings.openNewNoteInNewTab ? 'tab' : false)
                     .openFile(newFile);
             }
-            new Notice(`${note.getFullFilename()} created successfully`);
+            new Notice(t('notice.noteCreated', { file: note.getFullFilename() }));
         }
     }
 
@@ -100,7 +101,7 @@ export default class DefaultVaultRepository implements VaultRepository {
             file = this.getFileByPath(note.filePath);
         } catch (error) {
             if (error instanceof FileNotFoundError) {
-                new Notice(`Unable to edit ${note.getFullFilename()}`);
+                new Notice(t('notice.unableToEdit', { file: note.getFullFilename() }));
             } else {
                 throw error;
             }

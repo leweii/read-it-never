@@ -1,4 +1,4 @@
-summary.readitlater-setting-h1 {
+summary.readitnever-setting-h1 {
   font-variant: var(--h1-variant);
   letter-spacing: -0.015em;
   line-height: var(--h1-line-height);
@@ -11,7 +11,7 @@ summary.readitlater-setting-h1 {
   margin-block-end: var(--p-spacing);
 }
 
-summary.readitlater-setting-h3 {
+summary.readitnever-setting-h3 {
   font-variant: var(--h3-variant);
   letter-spacing: -0.015em;
   line-height: var(--h3-line-height);
@@ -24,7 +24,7 @@ summary.readitlater-setting-h3 {
   margin-block-end: var(--p-spacing);
 }
 
-summary.readitlater-setting-h4 {
+summary.readitnever-setting-h4 {
   font-variant: var(--h4-variant);
   letter-spacing: -0.015em;
   line-height: var(--h4-line-height);
@@ -37,6 +37,6 @@ summary.readitlater-setting-h4 {
   margin-block-end: var(--p-spacing);
 }
 
-hr.readitlater-setting-hr {
+hr.readitnever-setting-hr {
   margin: 1rem 0rem 0rem 0rem;
 }

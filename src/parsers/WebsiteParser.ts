@@ -4,6 +4,7 @@ import * as DOMPurify from 'isomorphic-dompurify';
 import { getBaseUrl, normalizeFilename } from 'src/helpers/fileutils';
 import { replaceImages } from 'src/helpers/replaceImages';
 import { desktopBrowserUserAgent } from 'src/helpers/networkUtils';
+import { t } from 'src/i18n';
 import { Note } from './Note';
 import { Parser } from './Parser';
 import { parseHtmlContent } from './parsehtml';
@@ -51,7 +52,7 @@ class WebsiteParser extends Parser {
 
     protected async makeNote(document: Document, originUrl: URL): Promise<Note> {
         if (!isProbablyReaderable(document)) {
-            new Notice('@mozilla/readability considers this document to unlikely be readerable.');
+            new Notice(t('notice.notReaderable'));
         }
 
         const createdAt = new Date();
@@ -183,7 +184,7 @@ class WebsiteParser extends Parser {
             figure.parentElement.before(figureEl);
         });
 
-        //fix for WeChat site (https://github.com/DominikPieper/obsidian-ReadItLater/issues/187)
+        //fix for WeChat site (https://github.com/DominikPieper/obsidian-ReadItNever/issues/187)
         document.body.querySelector('.rich_media_content.js_underline_content')?.removeAttribute('style');
         document.body.querySelectorAll('.rich_media_content.js_underline_content img[data-src]')?.forEach((imgEl) => {
             if (imgEl.getAttribute('src') === null) {

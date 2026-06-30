@@ -1,10 +1,10 @@
 import { Delimiter } from './enums/delimiter';
 import { FileExistsStrategy } from './enums/fileExistsStrategy';
 
-export type ReadItLaterSettingValue = string | number | boolean | Delimiter | FileExistsStrategy | null;
+export type ReadItNeverSettingValue = string | number | boolean | Delimiter | FileExistsStrategy | null;
 
-export interface ReadItLaterSettings {
-    [key: string]: ReadItLaterSettingValue;
+export interface ReadItNeverSettings {
+    [key: string]: ReadItNeverSettingValue;
     inboxDir: string;
     assetsDir: string;
     openNewNote: boolean;
@@ -22,11 +22,6 @@ export interface ReadItLaterSettings {
     youtubeTranscriptLanguage: string;
     youtubeTranscriptLine: string;
     youtubeTranscriptLinesPerBlock: number;
-    vimeoContentTypeSlug: string;
-    vimeoNoteTitle: string;
-    vimeoNote: string;
-    vimeoEmbedWidth: string;
-    vimeoEmbedHeight: string;
     bilibiliContentTypeSlug: string;
     bilibiliNoteTitle: string;
     bilibiliNote: string;
@@ -44,29 +39,11 @@ export interface ReadItLaterSettings {
     textSnippetContentType: string;
     textSnippetNoteTitle: string;
     textSnippetNote: string;
-    mastodonContentTypeSlug: string;
-    mastodonNoteTitle: string;
-    mastodonNote: string;
     downloadImages: boolean;
     downloadImagesInArticleDir: boolean;
     dateTitleFmt: string;
     dateContentFmt: string;
-    downloadMastodonMediaAttachments: boolean;
-    downloadMastodonMediaAttachmentsInDir: boolean;
-    saveMastodonReplies: boolean;
-    mastodonReply: string;
-    stackExchangeContentType: string;
-    stackExchangeNoteTitle: string;
-    stackExchangeNote: string;
-    stackExchangeAnswer: string;
-    downloadStackExchangeAssets: boolean;
-    downloadStackExchangeAssetsInDir: boolean;
     youtubeApiKey: string;
-    tikTokContentTypeSlug: string;
-    tikTokNoteTitle: string;
-    tikTokNote: string;
-    tikTokEmbedWidth: string;
-    tikTokEmbedHeight: string;
     extendShareMenu: boolean;
     filesystemLimitPath: number | null;
     filesystemLimitFileName: number | null;
@@ -74,20 +51,9 @@ export interface ReadItLaterSettings {
     youtubeChannelNoteTitle: string;
     youtubeChannelNote: string;
     fileExistsStrategy: FileExistsStrategy;
-    blueskyContentTypeSlug: string;
-    blueskyNoteTitle: string;
-    blueskyNote: string;
-    downloadBlueskyEmbeds: boolean;
-    downloadBlueskyEmbedsInDir: boolean;
-    saveBlueskyPostReplies: boolean;
-    blueskyPostReply: string;
-    pinterestContentTypeSlug: string;
-    pinterestNoteTitle: string;
-    pinterestNote: string;
-    downloadPinterestImage: boolean;
 }
 
-export const DEFAULT_SETTINGS: ReadItLaterSettings = {
+export const DEFAULT_SETTINGS: ReadItNeverSettings = {
     inboxDir: 'Read It Never Inbox',
     assetsDir: 'Read It Never Inbox/assets',
     openNewNote: false,
@@ -97,7 +63,7 @@ export const DEFAULT_SETTINGS: ReadItLaterSettings = {
     youtubeContentTypeSlug: 'youtube',
     youtubeNoteTitle: 'Youtube - {{ title }}',
     youtubeNote:
-        '[[ReadItNever]] [[Youtube]]\n\n# [{{ videoTitle }}]({{ videoURL }})\n\n{{ videoPlayer }}\n\n{{ videoChapters }}\n\n## Transcript\n\n{{ videoTranscript }}',
+        '#ReadItNever [[Youtube]]\n\n# [{{ videoTitle }}]({{ videoURL }})\n\n{{ videoPlayer }}\n\n{{ videoChapters }}\n\n## Transcript\n\n{{ videoTranscript }}',
     youtubeChapter: '- [{{ chapterTimestamp }}]({{ chapterUrl }}) {{ chapterTitle }}',
     youtubeEmbedWidth: '560',
     youtubeEmbedHeight: '315',
@@ -106,74 +72,35 @@ export const DEFAULT_SETTINGS: ReadItLaterSettings = {
     youtubeTranscriptLanguage: '',
     youtubeTranscriptLine: '[{{ transcriptTimestamp }}]({{ transcriptUrl }}) {{ transcriptText }}',
     youtubeTranscriptLinesPerBlock: 5,
-    vimeoContentTypeSlug: 'vimeo',
-    vimeoNoteTitle: 'Vimeo - {{ title }}',
-    vimeoNote:
-        '[[ReadItNever]] [[Vimeo]]\n\n# [{{ videoTitle }}]({{ videoURL }})\n\n{{ videoPlayer }}\n\n{{ videoChapters }}',
-    vimeoEmbedWidth: '560',
-    vimeoEmbedHeight: '315',
     bilibiliContentTypeSlug: 'bilibili',
     bilibiliNoteTitle: 'Bilibili - {{ title }}',
     bilibiliNote:
-        '[[ReadItNever]] [[Bilibili]]\n\n# [{{ videoTitle }}]({{ videoURL }})\n\n{{ videoPlayer }}\n\n{{ videoParts }}\n\n## Description\n\n{{ videoDescription }}',
+        '#ReadItNever [[Bilibili]]\n\n# [{{ videoTitle }}]({{ videoURL }})\n\n{{ videoPlayer }}\n\n{{ videoParts }}\n\n## Description\n\n{{ videoDescription }}',
     bilibiliEmbedWidth: '560',
     bilibiliEmbedHeight: '315',
     twitterContentTypeSlug: 'xcom',
     twitterNoteTitle: 'Tweet from {{ tweetAuthorName }} ({{ date }})',
-    twitterNote: '[[ReadItNever]] [[Tweet]]\n\n# [{{ tweetAuthorName }}]({{ tweetURL }})\n\n{{ tweetContent }}',
+    twitterNote: '#ReadItNever [[Tweet]]\n\n# [{{ tweetAuthorName }}]({{ tweetURL }})\n\n{{ tweetContent }}',
     parseableArticleContentType: 'article',
     parseableArticleNoteTitle: '{{ title }}',
-    parsableArticleNote:
-        '[[ReadItNever]] [[Article]]\n\n# [{{ articleTitle }}]({{ articleURL }})\n\n{{ articleContent }}',
+    parsableArticleNote: '#ReadItNever [[Article]]\n\n# [{{ articleTitle }}]({{ articleURL }})\n\n{{ articleContent }}',
     notParseableArticleContentType: 'article',
     notParseableArticleNoteTitle: 'Article {{ date }}',
-    notParsableArticleNote: '[[ReadItNever]] [[Article]]\n\n[{{ articleURL }}]({{ articleURL }})',
+    notParsableArticleNote: '#ReadItNever [[Article]]\n\n[{{ articleURL }}]({{ articleURL }})',
     textSnippetContentType: 'textsnippet',
     textSnippetNoteTitle: 'Note {{ date }}',
-    textSnippetNote: '[[ReadItNever]] [[Textsnippet]]\n\n{{ content }}',
-    mastodonContentTypeSlug: 'mastodon',
-    mastodonNoteTitle: 'Toot from {{ tootAuthorName }} ({{ date }})',
-    mastodonNote: '[[ReadItNever]] [[Toot]]\n\n# [{{ tootAuthorName }}]({{ tootURL }})\n\n> {{ tootContent }}',
+    textSnippetNote: '#ReadItNever [[Textsnippet]]\n\n{{ content }}',
     downloadImages: true,
     downloadImagesInArticleDir: false,
     dateTitleFmt: 'YYYY-MM-DD HH-mm-ss',
     dateContentFmt: 'YYYY-MM-DD',
-    downloadMastodonMediaAttachments: true,
-    downloadMastodonMediaAttachmentsInDir: false,
-    saveMastodonReplies: false,
-    mastodonReply: '[{{ tootAuthorName }}]({{ tootURL }})\n\n> {{ tootContent }}',
-    stackExchangeContentType: 'stackexchange',
-    stackExchangeNoteTitle: '{{ title }}',
-    stackExchangeNote:
-        '[[ReadItNever]] [[StackExchange]]\n\n# [{{ questionTitle }}]({{ questionURL }})\n\nAuthor: [{{ authorName }}]({{ authorProfileURL }})\n\n{{ questionContent }}\n\n***\n\n{{ topAnswer }}\n\n{{ answers }}',
-    stackExchangeAnswer: 'Answered by: [{{ authorName }}]({{ authorProfileURL }})\n\n{{ answerContent }}',
-    downloadStackExchangeAssets: true,
-    downloadStackExchangeAssetsInDir: false,
     youtubeApiKey: '',
-    tikTokContentTypeSlug: 'tiktok',
-    tikTokNoteTitle: 'TikTok from {{ authorName }} ({{ date }})',
-    tikTokNote:
-        '[[ReadItNever]] [[TikTok]]\n\n{{ videoDescription }}\n\n[{{ videoURL }}]({{ videoURL }})\n\n{{ videoPlayer }}',
-    tikTokEmbedWidth: '325',
-    tikTokEmbedHeight: '760',
     extendShareMenu: true,
     filesystemLimitPath: null,
     filesystemLimitFileName: null,
     youtubeChannelContentTypeSlug: 'youtube-channel',
     youtubeChannelNoteTitle: '{{ title }}',
     youtubeChannelNote:
-        '[[ReadItNever]] [[YoutubeChannel]]\n\n# [{{ channelTitle }}]({{ channelURL }})\n\n![{{ channelTitle }}|300]({{ channelAvatar }})\n\n[Videos]({{ channelVideosURL }})\n\n{{ channelSubscribersCount|numberLexify }} subscribers',
+        '#ReadItNever [[YoutubeChannel]]\n\n# [{{ channelTitle }}]({{ channelURL }})\n\n![{{ channelTitle }}|300]({{ channelAvatar }})\n\n[Videos]({{ channelVideosURL }})\n\n{{ channelSubscribersCount|numberLexify }} subscribers',
     fileExistsStrategy: FileExistsStrategy.Ask,
-    blueskyContentTypeSlug: 'bluesky',
-    blueskyNoteTitle: 'Status from {{ authorName }} ({{ date }})',
-    blueskyNote: '[[ReadItNever]] [[Bluesky]]\n\n# [{{ authorName }}]({{ postURL }})\n\n{{ content|blockquote }}',
-    downloadBlueskyEmbeds: true,
-    downloadBlueskyEmbedsInDir: false,
-    saveBlueskyPostReplies: false,
-    blueskyPostReply: '[{{ authorName }}]({{ postURL }})\n\n{{ content|blockquote }}',
-    pinterestContentTypeSlug: 'pinterest',
-    pinterestNoteTitle: 'Pin from {{ authorName }} ({{ date }})',
-    pinterestNote:
-        '[[ReadItNever]] [[Pinterest]]\n\n# [{{ authorName }}]({{ pinURL }})\n\n![]({{ image }})\n{{ description }}',
-    downloadPinterestImage: true,
 };

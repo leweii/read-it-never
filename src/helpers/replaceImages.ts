@@ -1,6 +1,6 @@
 import { CapacitorAdapter, DataAdapter, FileSystemAdapter, normalizePath, requestUrl } from 'obsidian';
 import { HTTPS_PROTOCOL, HTTP_PROTOCOL } from 'src/constants/urlProtocols';
-import ReadItLaterPlugin from 'src/main';
+import ReadItNeverPlugin from 'src/main';
 import { FilesystemLimits, getFileExtensionFromMimeType, getOsOptimizedPath, isValidUrl } from './fileutils';
 import { createRandomString } from './stringUtils';
 
@@ -13,7 +13,7 @@ const CREATE_FILENAME_ATTEMPTS = 5;
 const MAX_FILENAME_INDEX = 1000;
 
 export async function replaceImages(
-    plugin: ReadItLaterPlugin,
+    plugin: ReadItNeverPlugin,
     noteFileName: string,
     content: string,
     assetsDir: string,
@@ -44,7 +44,7 @@ async function replaceAsync(content: string, searchValue: string | RegExp, repla
     }
 }
 
-function imageTagProcessor(plugin: ReadItLaterPlugin, noteFileName: string, assetsDir: string): Replacer {
+function imageTagProcessor(plugin: ReadItNeverPlugin, noteFileName: string, assetsDir: string): Replacer {
     return async function processImageTag(match: string, anchor: string, link: string): Promise<string> {
         if (!isValidUrl(link, [HTTP_PROTOCOL, HTTPS_PROTOCOL])) {
             return match;

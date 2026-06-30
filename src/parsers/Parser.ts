@@ -1,16 +1,16 @@
 import { App } from 'obsidian';
 import TemplateEngine from 'src/template/TemplateEngine';
-import ReadItLaterPlugin from 'src/main';
+import ReadItNeverPlugin from 'src/main';
 import { isValidUrl } from 'src/helpers/fileutils';
 import { formatDate } from 'src/helpers/date';
 import { Note } from './Note';
 
 export abstract class Parser {
     protected app: App;
-    protected plugin: ReadItLaterPlugin;
+    protected plugin: ReadItNeverPlugin;
     protected templateEngine: TemplateEngine;
 
-    constructor(app: App, plugin: ReadItLaterPlugin, templateEngine: TemplateEngine) {
+    constructor(app: App, plugin: ReadItNeverPlugin, templateEngine: TemplateEngine) {
         this.app = app;
         this.plugin = plugin;
         this.templateEngine = templateEngine;

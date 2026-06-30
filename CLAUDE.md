@@ -14,12 +14,12 @@ There are no automated tests. The build output is a single `main.js` file bundle
 
 ## Architecture
 
-**ReadItLater** is an Obsidian plugin that saves web content as markdown notes. It supports 14 content types via a parser chain pattern.
+**ReadItNever** is an Obsidian plugin that saves web content as markdown notes. It supports several content types via a parser chain pattern.
 
 ### Data Flow
 
 1. User triggers action (ribbon icon, command, or context menu) → clipboard or provided content
-2. `ReadItLaterApi.processContent()` → `NoteService.createNote()`
+2. `ReadItNeverApi.processContent()` → `NoteService.createNote()`
 3. `ParserCreator` iterates registered parsers calling `parser.test(content)` until one matches
 4. Matched parser's `prepareNote()` fetches metadata and returns a `Note` object
 5. `TemplateEngine` renders note title and body using per-content-type templates from settings

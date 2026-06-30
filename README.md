@@ -11,13 +11,7 @@
     - [Youtube](#youtube)
     - [Youtube Channel](#youtube-channel)
     - [Twitter](#twitter)
-    - [Bluesky](#bluesky)
-    - [Stack Exchange](#stack-exchange)
-    - [Pinterest](#pinterest)
-    - [Mastodon](#mastodon)
-    - [Vimeo](#vimeo)
     - [Bilibili](#bilibili)
-    - [TikTok](#tiktok)
     - [Text Snippet](#text-snippet)
 - [API](#api)
 
@@ -248,136 +242,6 @@ Parser use [X Publish API](https://publish.twitter.com/) to fetch data.
 | tweetContent              | Post content                                                       |
 | tweetPublishDate          | Post publish date formatted in content format from plugin settings |
 
-### Bluesky
-
-Parser fetch the content from Bluesky API.
-
-| Title template variable | Description                                 |
-| ----------------------- | ------------------------------------------- |
-| authorHandle            | Post author handle                          |
-| authorName              | Post author name                            |
-| date                    | Current date in format from plugin settings |
-
-| Content template variable | Description                                                                     |
-| ------------------------- | ------------------------------------------------------------------------------- |
-| date                      | Current date in format from plugin settings                                     |
-| content                   | Formatted post content with embedded content. If enabled, replies are appended. |
-| postURL                   | Post URL                                                                        |
-| authorHandle              | Post author handle                                                              |
-| authorName                | Post author name                                                                |
-| likeCount                 | Post like count                                                                 |
-| replyCount                | Post reply count                                                                |
-| repostCount               | Post repost count                                                               |
-| quouteCount               | Post quote count                                                                |
-| publishedAt               | Post publish time                                                               |
-
-If enabled in plugin settings, you can fetch also replies.
-
-***Reply template variable***
-
-| Content template variable | Description                                   |
-| ------------------------- | --------------------------------------------- |
-| date                      | Current date in format from plugin settings   |
-| content                   | Formatted post content with embedded content. |
-| postURL                   | Reply URL                                     |
-| authorHandle              | Reply author handle                           |
-| authorName                | Reply author name                             |
-| likeCount                 | Reply like count                              |
-| replyCount                | Reply reply count                             |
-| repostCount               | Reply repost count                            |
-| quouteCount               | Reply quote count                             |
-| publishedAt               | Reply publish time                            |
-
-### Stack Exchange
-
-| Title template variable | Description                                 |
-| ----------------------- | ------------------------------------------- |
-| title                   | Question title                              |
-| date                    | Current date in format from plugin settings |
-
-***Note template variables***
-
-| Content template variable | Description                                 |
-| ------------------------- | ------------------------------------------- |
-| date                      | Current date in format from plugin settings |
-| questionTitle             | Question title                              |
-| questionURL               | Question URL on selected StackExchange site |
-| questionContent           | Question content                            |
-| authorName                | Question author name                        |
-| authorProfileURL          | Question author profile URL                 |
-| topAnswer                 | Formatted first answer                      |
-| answers                   | Formatted other answers                     |
-
-***Answer template variables***
-
-| Content template variable | Description                                 |
-| ------------------------- | ------------------------------------------- |
-| date                      | Current date in format from plugin settings |
-| answerContent             | Answer content                              |
-| authorName                | Answer author name                          |
-| authorProfileURL          | Answer author profile URL                   |
-
-### Pinterest
-
-| Title template variable | Description                                  |
-| ----------------------- | -------------------------------------------- |
-| authorName              | Pin author name                              |
-| date                    | Current date in format from plugin settings. |
-
-| Content template variable | Description                                          |
-| ------------------------- | ---------------------------------------------------- |
-| date                      | Current date in format from plugin settings.         |
-| pinId                     | Pin ID.                                              |
-| pinURL                    | URL of pin.                                          |
-| title                     | Pin title.                                           |
-| link                      | Pin link.                                            |
-| image                     | URL of pin image.                                    |
-| description               | Pin description.                                     |
-| likeCount                 | Pin like count.                                      |
-| authorName                | Pin author name.                                     |
-| authorProfileURL          | URL of Pin author page.                              |
-
-### Mastodon
-
-| Title template variable | Description                                 |
-| ----------------------- | ------------------------------------------- |
-| tootAuthorName          | Status author name                          |
-| date                    | Current date in format from plugin settings |
-
-| Content template variable | Description                                 |
-| ------------------------- | ------------------------------------------- |
-| tootAuthorName            | Status author name                          |
-| date                      | Current date in format from plugin settings |
-| tootURL                   | Status URL on selected Mastodon instance    |
-| tootContent               | Status content                              |
-
-If enabled in plugin settings, you can fetch also replies.
-
-***Reply template variable***
-
-| Content template variable | Description                                 |
-| ------------------------- | ------------------------------------------- |
-| tootAuthorName            | Reply author name                           |
-| tootURL                   | Reply URL on selected Mastodon instance     |
-| tootContent               | Reply content                               |
-
-### Vimeo
-
-| Title template variable | Description                                 |
-| ----------------------- | ------------------------------------------- |
-| title                   | Video title                                 |
-| date                    | Current date in format from plugin settings |
-
-| Content template variable | Description                                 |
-| ------------------------- | ------------------------------------------- |
-| videoTitle                | Video title                                 |
-| date                      | Current date in format from plugin settings |
-| videoURL                  | Video URL on Vimeo.com                      |
-| videoId                   | Video ID                                    |
-| videoPlayer               | Embeded player generated by plugin          |
-| channelName               | Channel name                                |
-| channelURL                | Channel URL on Vimeo.com                    |
-
 ### Bilibili
 
 | Title template variable | Description                                 |
@@ -405,23 +269,6 @@ If enabled in plugin settings, you can fetch also replies.
 
 Metadata is fetched from Bilibili's public `x/web-interface/view` API (no login required).
 
-### TikTok
-
-| Title template variable | Description                                 |
-| ----------------------- | ------------------------------------------- |
-| authorName              | Video author name                           |
-| date                    | Current date in format from plugin settings |
-
-| Content template variable | Description                                 |
-| ------------------------- | ------------------------------------------- |
-| videoDescription          | Video description                           |
-| date                      | Current date in format from plugin settings |
-| videoURL                  | Video URL on TikTok.com                     |
-| videoId                   | Video ID                                    |
-| videoPlayer               | Embeded player generated by plugin          |
-| authorName                | Author name                                 |
-| authorURL                 | Author profile URL on TikTok.com            |
-
 ### Text Snippet
 
 If your clipboard content is not recognized by any of above parsers plugin will create note with unformatted clipboard content.
@@ -437,4 +284,4 @@ If your clipboard content is not recognized by any of above parsers plugin will 
 
 ## API
 
-To invoke functionality from other plugins we provide an API. You can access it via `this.app.plugins.plugins['read-it-never'].api` which is an instance of `ReadItLaterApi` class defined in [src/ReadtItLaterApi.ts](https://github.com/leweii/read-it-never/blob/master/src/ReadtItLaterApi.ts).
+To invoke functionality from other plugins we provide an API. You can access it via `this.app.plugins.plugins['read-it-never'].api` which is an instance of `ReadItNeverApi` class defined in [src/ReadItNeverApi.ts](https://github.com/leweii/read-it-never/blob/master/src/ReadItNeverApi.ts).

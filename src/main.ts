@@ -1,15 +1,11 @@
 import { Editor, Menu, MenuItem, Platform, Plugin, addIcon } from 'obsidian';
-import { DEFAULT_SETTINGS, ReadItLaterSettingValue, ReadItLaterSettings } from './settings';
-import { ReadItLaterSettingsTab } from './views/settings-tab';
+import { DEFAULT_SETTINGS, ReadItNeverSettingValue, ReadItNeverSettings } from './settings';
+import { ReadItNeverSettingsTab } from './views/settings-tab';
 import YoutubeParser from './parsers/YoutubeParser';
-import VimeoParser from './parsers/VimeoParser';
 import BilibiliParser from './parsers/BilibiliParser';
 import TwitterParser from './parsers/TwitterParser';
-import StackExchangeParser from './parsers/StackExchangeParser';
 import WebsiteParser from './parsers/WebsiteParser';
 import TextSnippetParser from './parsers/TextSnippetParser';
-import MastodonParser from './parsers/MastodonParser';
-import TikTokParser from './parsers/TikTokParser';
 import ParserCreator from './parsers/ParserCreator';
 import { HTTPS_PROTOCOL, HTTP_PROTOCOL } from './constants/urlProtocols';
 import GithubParser from './parsers/GithubParser';
@@ -20,13 +16,12 @@ import YoutubeChannelParser from './parsers/YoutubeChannelParser';
 import { VaultRepository } from './repository/VaultRepository';
 import DefaultVaultRepository from './repository/DefaultVaultRepository';
 import { NoteService } from './NoteService';
-import { ReadItLaterApi } from './ReadtItLaterApi';
-import { BlueskyParser } from './parsers/BlueskyParser';
-import { PinterestParser } from './parsers/PinterestParser';
+import { ReadItNeverApi } from './ReadItNeverApi';
+import { t } from './i18n';
 
-export default class ReadItLaterPlugin extends Plugin {
-    public api: ReadItLaterApi;
-    public settings: ReadItLaterSettings;
+export default class ReadItNeverPlugin extends Plugin {
+    public api: ReadItNeverApi;
+    public settings: ReadItNeverSettings;
 
     private fileSystemLimits: FilesystemLimits;
     private noteService: NoteService;
@@ -50,32 +45,26 @@ export default class ReadItLaterPlugin extends Plugin {
         this.parserCreator = new ParserCreator([
             new YoutubeParser(this.app, this, this.templateEngine),
             new YoutubeChannelParser(this.app, this, this.templateEngine),
-            new VimeoParser(this.app, this, this.templateEngine),
             new BilibiliParser(this.app, this, this.templateEngine),
             new TwitterParser(this.app, this, this.templateEngine),
-            new StackExchangeParser(this.app, this, this.templateEngine),
-            new TikTokParser(this.app, this, this.templateEngine),
             new GithubParser(this.app, this, this.templateEngine),
             new WikipediaParser(this.app, this, this.templateEngine),
-            new BlueskyParser(this.app, this, this.templateEngine),
-            new PinterestParser(this.app, this, this.templateEngine),
-            new MastodonParser(this.app, this, this.templateEngine),
             new WebsiteParser(this.app, this, this.templateEngine),
             new TextSnippetParser(this.app, this, this.templateEngine),
         ]);
         this.vaultRepository = new DefaultVaultRepository(this, this.templateEngine);
         this.noteService = new NoteService(this.parserCreator, this, this.vaultRepository);
-        this.api = new ReadItLaterApi(this.noteService);
+        this.api = new ReadItNeverApi(this.noteService);
 
-        addIcon('read-it-later', clipboardIcon);
+        addIcon('read-it-never', clipboardIcon);
 
-        this.addRibbonIcon('read-it-later', 'Read It Never: Create from clipboard', async () => {
+        this.addRibbonIcon('read-it-never', t('ribbon.createFromClipboard'), async () => {
             await this.api.processContent(await this.getTextClipboardContent());
         });
 
         this.addCommand({
             id: 'save-clipboard-to-notice',
-            name: 'Create from clipboard',
+            name: t('command.createFromClipboard'),
             callback: async () => {
                 await this.api.processContent(await this.getTextClipboardContent());
             },
@@ -83,7 +72,7 @@ export default class ReadItLaterPlugin extends Plugin {
 
         this.addCommand({
             id: 'create-from-clipboard-batch',
-            name: 'Create from batch in clipboard',
+            name: t('command.createFromClipboardBatch'),
             callback: async () => {
                 await this.api.processContentBatch(await this.getTextClipboardContent());
             },
@@ -91,13 +80,13 @@ export default class ReadItLaterPlugin extends Plugin {
 
         this.addCommand({
             id: 'insert-at-cursor',
-            name: 'Insert at the cursor position',
+            name: t('command.insertAtCursor'),
             editorCallback: async (editor: Editor) => {
                 await this.api.insertContentAtEditorCursorPosition(await this.getTextClipboardContent(), editor);
             },
         });
 
-        this.addSettingTab(new ReadItLaterSettingsTab(this.app, this));
+        this.addSettingTab(new ReadItNeverSettingsTab(this.app, this));
 
         if (this.settings.extendShareMenu) {
             this.registerEvent(
@@ -105,8 +94,8 @@ export default class ReadItLaterPlugin extends Plugin {
                 // @ts-ignore
                 this.app.workspace.on('receive-text-menu', (menu: Menu, shareText: string) => {
                     menu.addItem((item: MenuItem) => {
-                        item.setTitle('Read It Never');
-                        item.setIcon('read-it-later');
+                        item.setTitle(t('menu.title'));
+                        item.setIcon('read-it-never');
                         item.onClick(() => this.api.processContent(shareText));
                     });
                 }),
@@ -117,8 +106,8 @@ export default class ReadItLaterPlugin extends Plugin {
             this.app.workspace.on('url-menu', (menu: Menu, url: string) => {
                 if (isValidUrl(url, [HTTP_PROTOCOL, HTTPS_PROTOCOL])) {
                     menu.addItem((item: MenuItem) => {
-                        item.setTitle('Read It Never');
-                        item.setIcon('read-it-later');
+                        item.setTitle(t('menu.title'));
+                        item.setIcon('read-it-never');
                         item.onClick(() => this.api.processContent(url));
                     });
                 }
@@ -127,10 +116,10 @@ export default class ReadItLaterPlugin extends Plugin {
     }
 
     async loadSettings(): Promise<void> {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, (await this.loadData()) as Partial<ReadItLaterSettings>);
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, (await this.loadData()) as Partial<ReadItNeverSettings>);
     }
 
-    async saveSetting(setting: string, value: ReadItLaterSettingValue): Promise<void> {
+    async saveSetting(setting: string, value: ReadItNeverSettingValue): Promise<void> {
         this.settings[setting] = value;
         await this.saveSettings();
     }

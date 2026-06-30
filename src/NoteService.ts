@@ -1,17 +1,18 @@
 import { Editor, Notice } from 'obsidian';
+import { t } from './i18n';
 import ParserCreator from './parsers/ParserCreator';
 import { VaultRepository } from './repository/VaultRepository';
 import { Note } from './parsers/Note';
 import FileExistsError from './error/FileExists';
 import FileExistsAsk from './modal/FileExistsAsk';
 import { FileExistsStrategy } from './enums/fileExistsStrategy';
-import ReadItLaterPlugin from './main';
+import ReadItNeverPlugin from './main';
 import { getAndCheckUrls } from './helpers/stringUtils';
 
 export class NoteService {
     constructor(
         private parserCreator: ParserCreator,
-        private plugin: ReadItLaterPlugin,
+        private plugin: ReadItNeverPlugin,
         private repository: VaultRepository,
     ) {}
 
@@ -57,7 +58,7 @@ export class NoteService {
             return await parser.prepareNote(content);
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            new Notice(`Read It Never: Failed to process content. ${message}`);
+            new Notice(t('notice.failedToProcess', { message }));
             throw error;
         }
     }
@@ -71,7 +72,7 @@ export class NoteService {
                     .openFile(file);
             } catch (error) {
                 console.error(error);
-                new Notice(`Unable to open ${note.getFullFilename()}`);
+                new Notice(t('notice.unableToOpen', { file: note.getFullFilename() }));
             }
         }
     }
@@ -115,17 +116,17 @@ export class NoteService {
         for (const note of notes) {
             try {
                 await this.repository.appendToExistingNote(note);
-                new Notice(`${note.getFullFilename()} was updated.`);
+                new Notice(t('notice.noteUpdated', { file: note.getFullFilename() }));
             } catch (error) {
                 console.error(error);
-                new Notice(`${note.getFullFilename()} was not updated!`, 0);
+                new Notice(t('notice.noteNotUpdated', { file: note.getFullFilename() }), 0);
             }
         }
     }
 
     private handleFileExistsStrategyNothing(notes: Note[]): void {
         for (const note of notes) {
-            new Notice(`${note.getFullFilename()} already exists.`);
+            new Notice(t('notice.noteAlreadyExists', { file: note.getFullFilename() }));
         }
     }
 }

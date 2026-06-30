@@ -22,12 +22,12 @@ export default class WikipediaParser extends WebsiteParser {
             element.textContent = '\u00A0' + element.textContent;
         });
 
-        // fix for https://github.com/DominikPieper/obsidian-ReadItLater/issues/176
+        // fix for https://github.com/DominikPieper/obsidian-ReadItNever/issues/176
         document.querySelectorAll('.mw-cite-backlink').forEach((element) => {
             element.remove();
         });
 
-        // fix for https://github.com/DominikPieper/obsidian-ReadItLater/issues/174
+        // fix for https://github.com/DominikPieper/obsidian-ReadItNever/issues/174
         document.querySelectorAll('.infobox caption').forEach((element) => {
             const newParagraph = document.createElement('p');
             newParagraph.append(...Array.from(element.childNodes));

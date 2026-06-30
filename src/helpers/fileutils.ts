@@ -1,5 +1,5 @@
 import { CapacitorAdapter, FileSystemAdapter, Platform, normalizePath } from 'obsidian';
-import { ReadItLaterSettings } from 'src/settings';
+import { ReadItNeverSettings } from 'src/settings';
 import mime from 'mime';
 
 export interface FilesystemLimits {
@@ -65,7 +65,7 @@ export function getOsOptimizedPath(
     return optimizedFilePath;
 }
 
-export function getFileSystemLimits(platform: typeof Platform, settings: ReadItLaterSettings): FilesystemLimits {
+export function getFileSystemLimits(platform: typeof Platform, settings: ReadItNeverSettings): FilesystemLimits {
     const defaultFilesystenLimits = getDefaultFilesystenLimits(platform);
 
     return {

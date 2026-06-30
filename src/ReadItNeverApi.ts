@@ -1,7 +1,7 @@
 import { Editor } from 'obsidian';
 import { NoteService } from './NoteService';
 
-export class ReadItLaterApi {
+export class ReadItNeverApi {
     constructor(private noteService: NoteService) {}
 
     /**

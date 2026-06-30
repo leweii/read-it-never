@@ -51,6 +51,12 @@ interface YoutubeTranscriptSegment {
     seconds: number;
 }
 
+interface YoutubeCaptionTrack {
+    baseUrl: string;
+    languageCode?: string;
+    kind?: string;
+}
+
 interface YoutubeChannel {
     thumbnails: GoogleApiYouTubeThumbnailResource;
 }
@@ -343,8 +349,8 @@ class YoutubeParser extends Parser {
                 }),
             );
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const captionTracks: any[] = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
+            const captionTracks: YoutubeCaptionTrack[] =
+                playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks ?? [];
             if (captionTracks.length === 0) {
                 return '';
             }

@@ -37,7 +37,7 @@ export class ReadItLaterSettingsTab extends PluginSettingTab {
 
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: 'General' });
+        new Setting(containerEl).setName('General').setHeading();
 
         new Setting(containerEl)
             .setName('Inbox directory')
@@ -206,7 +206,7 @@ export class ReadItLaterSettingsTab extends PluginSettingTab {
                     }),
             );
 
-        containerEl.createEl('h1', { text: 'Content Types' });
+        new Setting(containerEl).setName('Content Types').setHeading();
         containerEl.createDiv({ text: 'Settings for each content. Click on caret to expand.' });
 
         let detailsEl: HTMLElement;
@@ -1324,7 +1324,7 @@ export class ReadItLaterSettingsTab extends PluginSettingTab {
                 textarea.inputEl.cols = 25;
             });
 
-        containerEl.createEl('h2', { text: 'Advanced' });
+        new Setting(containerEl).setName('Advanced').setHeading();
 
         const defaultFilesystemLimits = getDefaultFilesystenLimits(Platform);
 

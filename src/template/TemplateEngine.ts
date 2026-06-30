@@ -293,12 +293,6 @@ export default class TemplateEngine {
 
     private evaluateArgument(arg: string): any {
         try {
-            // Handle arrow functions
-            if (arg.includes('=>')) {
-                const arrowFunc = Function(`return ${arg}`)();
-                return typeof arrowFunc === 'function' ? arrowFunc : arg;
-            }
-
             // Handle quoted strings
             if ((arg.startsWith('"') && arg.endsWith('"')) || (arg.startsWith("'") && arg.endsWith("'"))) {
                 return arg.slice(1, -1);

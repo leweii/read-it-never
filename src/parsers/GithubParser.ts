@@ -17,7 +17,9 @@ export default class GithubParser extends WebsiteParser {
         if (readme) {
             // Remove anchor elements causing to show empty links
             readme.querySelectorAll('[aria-label^="Permalink:"]').forEach((anchorElement) => anchorElement.remove());
-            document.querySelector('body').innerHTML = readme.outerHTML;
+            const body = document.querySelector('body');
+            body.empty();
+            body.append(readme);
         }
 
         return this.makeNote(document, originUrl);

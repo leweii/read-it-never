@@ -1,3 +1,5 @@
+import { sanitizeHTMLToDom } from 'obsidian';
+
 export function createHTMLDiv(html: string): DocumentFragment {
-    return createFragment((documentFragment) => (documentFragment.createDiv().innerHTML = html));
+    return sanitizeHTMLToDom(html);
 }

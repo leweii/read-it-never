@@ -22,19 +22,17 @@ export async function parseHtmlContent(content: string) {
             );
         },
         replacement: function (_content, node, options) {
-            node.querySelectorAll('p').forEach((codeLine) => {
-                codeLine.innerHTML = codeLine.innerHTML + '\n';
+            const codeBlock = node as HTMLElement;
+            codeBlock.querySelectorAll('p').forEach((codeLine) => {
+                codeLine.append('\n');
             });
+            const codeNode = codeBlock.firstChild as HTMLElement;
             return (
-                //eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                //@ts-ignore
                 '\n\n' +
                 options.fence +
-                //eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                //@ts-ignore
-                node.firstChild.getAttribute('data-lang') +
+                codeNode.getAttribute('data-lang') +
                 '\n' +
-                node.firstChild.textContent +
+                codeNode.textContent +
                 '\n' +
                 options.fence +
                 '\n\n'
@@ -51,14 +49,13 @@ export async function parseHtmlContent(content: string) {
             );
         },
         replacement: function (_content, node, options) {
-            //eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            //@ts-ignore
-            node.innerHTML = node.innerHTML.replaceAll('<br-keep></br-keep>', '<br>');
-            //eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            //@ts-ignore
-            const langMatch = node.id?.match(/code-lang-(.+)/);
+            const codeBlock = node as HTMLElement;
+            codeBlock
+                .querySelectorAll('br-keep')
+                .forEach((br) => br.replaceWith(codeBlock.ownerDocument.createElement('br')));
+            const langMatch = codeBlock.id?.match(/code-lang-(.+)/);
             const language = langMatch?.length > 0 ? langMatch[1] : '';
-            const code = node.textContent;
+            const code = codeBlock.textContent;
 
             const fenceChar = options.fence.charAt(0);
             let fenceSize = 3;

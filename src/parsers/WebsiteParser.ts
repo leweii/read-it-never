@@ -129,15 +129,16 @@ class WebsiteParser extends Parser {
         const baseEl = document.createElement('base');
         baseEl.setAttribute('href', getBaseUrl(originBaseUrl ?? url.href, url.origin));
         document.head.append(baseEl);
-        const cleanDocumentBody = DOMPurify.sanitize(document.body.innerHTML);
-        document.body.innerHTML = cleanDocumentBody;
+        const cleanDocumentBody = DOMPurify.sanitize(document.body.innerHTML, { RETURN_DOM_FRAGMENT: true });
+        document.body.empty();
+        document.body.append(cleanDocumentBody);
 
         /*
         DOM optimizations from MarkDownload. Distributed under an Apache License 2.0: https://github.com/deathau/markdownload/blob/main/LICENSE
         */
         document.body.querySelectorAll('pre br')?.forEach((br) => {
             // we need to keep <br> tags because they are removed by Readability.js
-            br.outerHTML = '<br-keep></br-keep>';
+            br.replaceWith(br.ownerDocument.createElement('br-keep'));
         });
 
         document.body.querySelectorAll('h1, h2, h3, h4, h5, h6')?.forEach((header) => {

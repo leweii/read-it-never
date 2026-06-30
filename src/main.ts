@@ -101,8 +101,8 @@ export default class ReadItLaterPlugin extends Plugin {
 
         if (this.settings.extendShareMenu) {
             this.registerEvent(
-                //eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                //@ts-ignore
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment -- 'receive-text-menu' is an undocumented Obsidian event missing from the typed workspace API
+                // @ts-ignore
                 this.app.workspace.on('receive-text-menu', (menu: Menu, shareText: string) => {
                     menu.addItem((item: MenuItem) => {
                         item.setTitle('Read It Never');

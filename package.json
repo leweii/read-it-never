@@ -1,6 +1,6 @@
 {
   "name": "read-it-never",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Save online content to your Vault, utilize embedded template engine and organize your reading list to your needs. Preserve the web with Read It Never.",
   "main": "main.js",
   "scripts": {

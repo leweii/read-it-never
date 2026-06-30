@@ -114,7 +114,8 @@ export const DEFAULT_SETTINGS: ReadItLaterSettings = {
     vimeoEmbedHeight: '315',
     bilibiliContentTypeSlug: 'bilibili',
     bilibiliNoteTitle: 'Bilibili - {{ title }}',
-    bilibiliNote: '[[ReadItNever]] [[Bilibili]]\n\n# [{{ videoTitle }}]({{ videoURL }})\n\n{{ videoPlayer }}',
+    bilibiliNote:
+        '[[ReadItNever]] [[Bilibili]]\n\n# [{{ videoTitle }}]({{ videoURL }})\n\n{{ videoPlayer }}\n\n{{ videoParts }}\n\n## Description\n\n{{ videoDescription }}',
     bilibiliEmbedWidth: '560',
     bilibiliEmbedHeight: '315',
     twitterContentTypeSlug: 'xcom',

@@ -3,13 +3,59 @@ import { handleError } from 'src/helpers/error';
 import { Note } from './Note';
 import { Parser } from './Parser';
 
-interface BilibiliNoteData {
+interface BilibiliViewResponse {
+    code: number;
+    message: string;
+    data?: BilibiliViewData;
+}
+
+interface BilibiliViewData {
+    bvid: string;
+    aid: number;
+    title: string;
+    desc: string;
+    pic: string;
+    pubdate: number;
+    duration: number;
+    owner: BilibiliOwner;
+    stat: BilibiliStat;
+    pages: BilibiliPage[];
+}
+
+interface BilibiliOwner {
+    mid: number;
+    name: string;
+    face: string;
+}
+
+interface BilibiliStat {
+    view: number;
+}
+
+interface BilibiliPage {
+    cid: number;
+    page: number;
+    part: string;
+    duration: number;
+}
+
+type BilibiliNoteData = {
     date: string;
     videoId: string;
     videoTitle: string;
     videoURL: string;
     videoPlayer: string;
-}
+    videoDescription: string;
+    videoThumbnail: string;
+    channelName: string;
+    channelURL: string;
+    videoPublishDate: string;
+    videoViewsCount: number;
+    videoDuration: number;
+    videoDurationFormatted: string;
+    videoPartsCount: number;
+    videoParts: string;
+};
 
 class BilibiliParser extends Parser {
     private PATTERN = /(bilibili.com)\/(video)?\/([a-z0-9]+)?/i;
@@ -38,12 +84,16 @@ class BilibiliParser extends Parser {
     }
 
     private async getNoteData(url: string, createdAt: Date): Promise<BilibiliNoteData> {
+        const videoId = this.PATTERN.exec(url)?.[3] ?? '';
+        const idQuery = /^av\d+$/i.test(videoId) ? `aid=${videoId.slice(2)}` : `bvid=${videoId}`;
+
         const response = await requestUrl({
             method: 'GET',
-            url,
+            url: `https://api.bilibili.com/x/web-interface/view?${idQuery}`,
             headers: {
                 'user-agent':
                     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
+                referer: 'https://www.bilibili.com',
             },
         });
 
@@ -54,17 +104,59 @@ class BilibiliParser extends Parser {
             throw new Error(`HTTP ${response.status} error fetching ${url}`);
         }
 
-        const html = new TextDecoder().decode(response.arrayBuffer);
-        const videoHTML = new DOMParser().parseFromString(html, 'text/html');
-        const videoId = this.PATTERN.exec(url)[3] ?? '';
+        const body = response.json as BilibiliViewResponse;
+        if (body.code !== 0 || !body.data) {
+            throw new Error(`Bilibili API error (code ${body.code}): ${body.message}`);
+        }
+
+        const video = body.data;
 
         return {
             date: this.getFormattedDateForContent(createdAt),
-            videoId: videoId,
-            videoTitle: videoHTML.querySelector("[property~='og:title']")?.getAttribute('content') ?? '',
+            videoId: video.bvid,
+            videoTitle: video.title,
             videoURL: url,
-            videoPlayer: `<iframe width="${this.plugin.settings.bilibiliEmbedWidth}" height="${this.plugin.settings.bilibiliEmbedHeight}" src="https://player.bilibili.com/player.html?autoplay=0&bvid=${videoId}" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>`,
+            videoPlayer: `<iframe width="${this.plugin.settings.bilibiliEmbedWidth}" height="${this.plugin.settings.bilibiliEmbedHeight}" src="https://player.bilibili.com/player.html?autoplay=0&bvid=${video.bvid}" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>`,
+            videoDescription: video.desc,
+            videoThumbnail: video.pic.replace(/^http:/, 'https:'),
+            channelName: video.owner.name,
+            channelURL: `https://space.bilibili.com/${video.owner.mid}`,
+            videoPublishDate: this.getFormattedDateForContent(new Date(video.pubdate * 1000)),
+            videoViewsCount: video.stat.view,
+            videoDuration: video.duration,
+            videoDurationFormatted: this.formatDuration(video.duration),
+            videoPartsCount: video.pages.length,
+            videoParts: this.formatParts(video.bvid, video.pages),
         };
+    }
+
+    private formatDuration(totalSeconds: number): string {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+
+        let formatted = '';
+        if (hours > 0) {
+            formatted = formatted.concat(' ', `${hours}h`);
+        }
+        if (minutes > 0) {
+            formatted = formatted.concat(' ', `${minutes}m`);
+        }
+        if (seconds > 0) {
+            formatted = formatted.concat(' ', `${seconds}s`);
+        }
+
+        return formatted.trim();
+    }
+
+    private formatParts(bvid: string, pages: BilibiliPage[]): string {
+        if (pages.length <= 1) {
+            return '';
+        }
+
+        return pages
+            .map((page) => `- [P${page.page}](https://www.bilibili.com/video/${bvid}?p=${page.page}) ${page.part}`)
+            .join('\n');
     }
 }
 

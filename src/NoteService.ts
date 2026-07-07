@@ -8,6 +8,7 @@ import FileExistsAsk from './modal/FileExistsAsk';
 import { FileExistsStrategy } from './enums/fileExistsStrategy';
 import ReadItNeverPlugin from './main';
 import { getAndCheckUrls } from './helpers/stringUtils';
+import { revealActiveFileInExplorer } from './helpers/workspaceUtils';
 
 export class NoteService {
     constructor(
@@ -69,7 +70,8 @@ export class NoteService {
                 const file = this.repository.getFileByPath(note.filePath);
                 void this.plugin.app.workspace
                     .getLeaf(this.plugin.settings.openNewNoteInNewTab ? 'tab' : false)
-                    .openFile(file);
+                    .openFile(file)
+                    .then(() => revealActiveFileInExplorer(this.plugin.app));
             } catch (error) {
                 console.error(error);
                 new Notice(t('notice.unableToOpen', { file: note.getFullFilename() }));

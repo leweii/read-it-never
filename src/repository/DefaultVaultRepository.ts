@@ -8,6 +8,7 @@ import TemplateEngine from 'src/template/TemplateEngine';
 import { formatDate } from 'src/helpers/date';
 import { t } from 'src/i18n';
 import FileNotFoundError from 'src/error/FileNotFound';
+import { revealActiveFileInExplorer } from 'src/helpers/workspaceUtils';
 
 export default class DefaultVaultRepository implements VaultRepository {
     private plugin: ReadItNeverPlugin;
@@ -67,6 +68,7 @@ export default class DefaultVaultRepository implements VaultRepository {
                 await this.plugin.app.workspace
                     .getLeaf(this.plugin.settings.openNewNoteInNewTab ? 'tab' : false)
                     .openFile(newFile);
+                revealActiveFileInExplorer(this.plugin.app);
             }
             new Notice(t('notice.noteCreated', { file: note.getFullFilename() }));
         }

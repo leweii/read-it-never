@@ -630,6 +630,84 @@ export class ReadItNeverSettingsTab extends PluginSettingTab {
                 }),
         );
 
+        new Setting(detailsEl)
+            .setName(t('settings.bilibili.fetchTranscript.name'))
+            .setDesc(t('settings.bilibili.fetchTranscript.desc'))
+            .addToggle((toggle) =>
+                toggle
+                    .setValue(
+                        Object.prototype.hasOwnProperty.call(this.plugin.settings, 'bilibiliFetchTranscript')
+                            ? this.plugin.settings.bilibiliFetchTranscript
+                            : DEFAULT_SETTINGS.bilibiliFetchTranscript,
+                    )
+                    .onChange(async (value) => {
+                        this.plugin.settings.bilibiliFetchTranscript = value;
+                        await this.plugin.saveSettings();
+                    }),
+            );
+
+        new Setting(detailsEl)
+            .setName(t('settings.bilibili.sessdata.name'))
+            .setDesc(t('settings.bilibili.sessdata.desc'))
+            .addText((text) =>
+                text
+                    .setValue(this.plugin.settings.bilibiliSessdata || DEFAULT_SETTINGS.bilibiliSessdata)
+                    .onChange(async (value) => {
+                        this.plugin.settings.bilibiliSessdata = value.trim();
+                        await this.plugin.saveSettings();
+                    }),
+            );
+
+        new Setting(detailsEl)
+            .setName(t('settings.bilibili.transcriptLanguage.name'))
+            .setDesc(t('settings.bilibili.transcriptLanguage.desc'))
+            .addText((text) =>
+                text
+                    .setPlaceholder('zh-CN')
+                    .setValue(
+                        this.plugin.settings.bilibiliTranscriptLanguage || DEFAULT_SETTINGS.bilibiliTranscriptLanguage,
+                    )
+                    .onChange(async (value) => {
+                        this.plugin.settings.bilibiliTranscriptLanguage = value.trim();
+                        await this.plugin.saveSettings();
+                    }),
+            );
+
+        new Setting(detailsEl)
+            .setName(t('settings.bilibili.transcriptLine.name'))
+            .setDesc(t('settings.bilibili.transcriptLine.desc'))
+            .addText((text) =>
+                text
+                    .setPlaceholder(DEFAULT_SETTINGS.bilibiliTranscriptLine)
+                    .setValue(this.plugin.settings.bilibiliTranscriptLine || DEFAULT_SETTINGS.bilibiliTranscriptLine)
+                    .onChange(async (value) => {
+                        this.plugin.settings.bilibiliTranscriptLine = value;
+                        await this.plugin.saveSettings();
+                    }),
+            );
+
+        new Setting(detailsEl)
+            .setName(t('settings.bilibili.transcriptLinesPerBlock.name'))
+            .setDesc(t('settings.bilibili.transcriptLinesPerBlock.desc'))
+            .addText((text) =>
+                text
+                    .setPlaceholder(String(DEFAULT_SETTINGS.bilibiliTranscriptLinesPerBlock))
+                    .setValue(
+                        String(
+                            this.plugin.settings.bilibiliTranscriptLinesPerBlock ||
+                                DEFAULT_SETTINGS.bilibiliTranscriptLinesPerBlock,
+                        ),
+                    )
+                    .onChange(async (value) => {
+                        const parsed = parseInt(value, 10);
+                        this.plugin.settings.bilibiliTranscriptLinesPerBlock =
+                            Number.isNaN(parsed) || parsed < 1
+                                ? DEFAULT_SETTINGS.bilibiliTranscriptLinesPerBlock
+                                : parsed;
+                        await this.plugin.saveSettings();
+                    }),
+            );
+
         containerEl.createEl('hr', { cls: 'readitnever-setting-hr' });
         detailsEl = this.createDetailsElement(containerEl, DetailsItem.NonReadableArticle);
         detailsEl.createEl('summary', {

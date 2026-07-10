@@ -27,6 +27,11 @@ export interface ReadItNeverSettings {
     bilibiliNote: string;
     bilibiliEmbedWidth: string;
     bilibiliEmbedHeight: string;
+    bilibiliFetchTranscript: boolean;
+    bilibiliSessdata: string;
+    bilibiliTranscriptLanguage: string;
+    bilibiliTranscriptLine: string;
+    bilibiliTranscriptLinesPerBlock: number;
     twitterContentTypeSlug: string;
     twitterNoteTitle: string;
     twitterNote: string;
@@ -75,9 +80,14 @@ export const DEFAULT_SETTINGS: ReadItNeverSettings = {
     bilibiliContentTypeSlug: 'bilibili',
     bilibiliNoteTitle: 'Bili-{{ date }}-{{ title }}',
     bilibiliNote:
-        '#ReadItNever [[Bilibili]]\n\n# [{{ videoTitle }}]({{ videoURL }})\n\n{{ videoPlayer }}\n\n{{ videoParts }}\n\n## Description\n\n{{ videoDescription }}',
+        '#ReadItNever [[Bilibili]]\n\n# [{{ videoTitle }}]({{ videoURL }})\n\n{{ videoPlayer }}\n\n{{ videoParts }}\n\n## Description\n\n{{ videoDescription }}\n\n## Transcript\n\n{{ videoTranscript }}',
     bilibiliEmbedWidth: '560',
     bilibiliEmbedHeight: '315',
+    bilibiliFetchTranscript: true,
+    bilibiliSessdata: '',
+    bilibiliTranscriptLanguage: '',
+    bilibiliTranscriptLine: '[{{ transcriptTimestamp }}]({{ transcriptUrl }}) {{ transcriptText }}',
+    bilibiliTranscriptLinesPerBlock: 5,
     twitterContentTypeSlug: 'xcom',
     twitterNoteTitle: 'Tweet-{{ date }}-{{ tweetAuthorName }}',
     twitterNote: '#ReadItNever [[Tweet]]\n\n# [{{ tweetAuthorName }}]({{ tweetURL }})\n\n{{ tweetContent }}',

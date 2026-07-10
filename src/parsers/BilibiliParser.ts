@@ -1,4 +1,4 @@
-import { requestUrl } from 'obsidian';
+import { request, requestUrl } from 'obsidian';
 import { Note } from './Note';
 import { Parser } from './Parser';
 import { handleError } from 'src/helpers/error';
@@ -39,6 +39,39 @@ interface BilibiliPage {
     duration: number;
 }
 
+// Shape of the `player/v2` endpoint fields consumed in `getVideoTranscript`.
+interface BilibiliPlayerResponse {
+    code: number;
+    message: string;
+    data?: {
+        subtitle?: {
+            subtitles?: BilibiliSubtitleTrack[];
+        };
+    };
+}
+
+interface BilibiliSubtitleTrack {
+    lan: string;
+    lan_doc: string;
+    subtitle_url: string;
+}
+
+// Shape of the subtitle JSON file referenced by `subtitle_url`.
+interface BilibiliSubtitleFile {
+    body: BilibiliSubtitleLine[];
+}
+
+interface BilibiliSubtitleLine {
+    from: number;
+    to: number;
+    content: string;
+}
+
+interface BilibiliTranscriptSegment {
+    text: string;
+    seconds: number;
+}
+
 type BilibiliNoteData = {
     date: string;
     videoId: string;
@@ -55,6 +88,7 @@ type BilibiliNoteData = {
     videoDurationFormatted: string;
     videoPartsCount: number;
     videoParts: string;
+    videoTranscript: string;
 };
 
 class BilibiliParser extends Parser {
@@ -111,6 +145,9 @@ class BilibiliParser extends Parser {
 
         const video = body.data;
 
+        const firstPageCid = video.pages?.[0]?.cid;
+        const videoTranscript = await this.getVideoTranscript(video.bvid, firstPageCid);
+
         return {
             date: this.getFormattedDateForContent(createdAt),
             videoId: video.bvid,
@@ -127,7 +164,111 @@ class BilibiliParser extends Parser {
             videoDurationFormatted: this.formatDuration(video.duration),
             videoPartsCount: video.pages.length,
             videoParts: this.formatParts(video.bvid, video.pages),
+            videoTranscript,
         };
+    }
+
+    /**
+     * Fetches the video's closed captions as plain text.
+     *
+     * Unlike YouTube, Bilibili only returns the subtitle list to authenticated requests: the
+     * `player/v2` endpoint returns an empty `subtitles` array for anonymous callers. The user must
+     * supply their `SESSDATA` cookie (copied from a logged-in browser session) in the plugin
+     * settings for this to work.
+     */
+    private async getVideoTranscript(bvid: string, cid?: number): Promise<string> {
+        if (!this.plugin.settings.bilibiliFetchTranscript || !cid) {
+            return '';
+        }
+
+        try {
+            const sessdata = this.plugin.settings.bilibiliSessdata?.trim();
+            const headers: Record<string, string> = {
+                'user-agent':
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
+                referer: 'https://www.bilibili.com',
+            };
+            if (sessdata) {
+                headers.cookie = `SESSDATA=${sessdata}`;
+            }
+
+            const playerResponse = JSON.parse(
+                await request({
+                    method: 'GET',
+                    url: `https://api.bilibili.com/x/player/v2?bvid=${bvid}&cid=${cid}`,
+                    headers,
+                }),
+            ) as BilibiliPlayerResponse;
+
+            const subtitles = playerResponse?.data?.subtitle?.subtitles ?? [];
+            if (subtitles.length === 0) {
+                return '';
+            }
+
+            const language = this.plugin.settings.bilibiliTranscriptLanguage?.trim();
+            const track =
+                (language && subtitles.find((subtitle) => subtitle.lan === language)) ||
+                (language && subtitles.find((subtitle) => subtitle.lan?.startsWith(`${language}-`))) ||
+                subtitles.find((subtitle) => !subtitle.lan?.startsWith('ai-')) ||
+                subtitles[0];
+
+            if (!track?.subtitle_url) {
+                return '';
+            }
+
+            const subtitleUrl = track.subtitle_url.startsWith('//')
+                ? `https:${track.subtitle_url}`
+                : track.subtitle_url;
+            const subtitleFile = JSON.parse(
+                await request({ method: 'GET', url: subtitleUrl, headers }),
+            ) as BilibiliSubtitleFile;
+
+            return this.formatVideoTranscript(bvid, this.parseTranscriptSegments(subtitleFile));
+        } catch {
+            // A missing/unavailable transcript should not block note creation.
+            return '';
+        }
+    }
+
+    private parseTranscriptSegments(subtitleFile: BilibiliSubtitleFile): BilibiliTranscriptSegment[] {
+        return (subtitleFile.body ?? [])
+            .map((line) => ({ text: (line.content ?? '').replace(/\s+/g, ' ').trim(), seconds: Math.floor(line.from) }))
+            .filter((segment) => segment.text !== '');
+    }
+
+    private formatVideoTranscript(bvid: string, segments: BilibiliTranscriptSegment[]): string {
+        // Group several caption segments into one block so each line is a readable chunk of text
+        // prefixed by a single linked timestamp, instead of one tiny fragment per line.
+        const linesPerBlock = Math.max(1, this.plugin.settings.bilibiliTranscriptLinesPerBlock);
+        const blocks: BilibiliTranscriptSegment[] = [];
+
+        segments.forEach((segment, index) => {
+            if (index % linesPerBlock === 0) {
+                blocks.push({ text: segment.text, seconds: segment.seconds });
+            } else {
+                blocks[blocks.length - 1].text += ` ${segment.text}`;
+            }
+        });
+
+        return blocks
+            .map((block) => {
+                return this.templateEngine.render(this.plugin.settings.bilibiliTranscriptLine, {
+                    transcriptTimestamp: this.formatTimestamp(block.seconds),
+                    transcriptText: block.text.trim(),
+                    transcriptSeconds: block.seconds,
+                    transcriptUrl: `https://www.bilibili.com/video/${bvid}?t=${block.seconds}`,
+                });
+            }, this)
+            .join('\n');
+    }
+
+    private formatTimestamp(totalSeconds: number): string {
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        const pad = (value: number): string => String(value).padStart(2, '0');
+
+        return hours > 0 ? `${pad(hours)}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
     }
 
     private formatDuration(totalSeconds: number): string {

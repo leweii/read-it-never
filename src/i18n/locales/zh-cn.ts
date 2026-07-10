@@ -106,6 +106,20 @@ const zhCN: Record<string, string> = {
     'settings.bilibili.template.name': 'Bilibili 笔记模板',
     'settings.bilibili.embedWidth.name': 'Bilibili 嵌入播放器宽度',
     'settings.bilibili.embedHeight.name': 'Bilibili 嵌入播放器高度',
+    'settings.bilibili.fetchTranscript.name': '获取视频字幕文稿',
+    'settings.bilibili.fetchTranscript.desc':
+        '启用后，将获取视频字幕并通过 {{ videoTranscript }} 模板变量提供。Bilibili 仅对已登录的请求返回字幕，因此需要填写 SESSDATA Cookie（见下方）。',
+    'settings.bilibili.sessdata.name': 'SESSDATA Cookie',
+    'settings.bilibili.sessdata.desc':
+        '你的 Bilibili SESSDATA Cookie 值。在浏览器中登录 bilibili.com，打开开发者工具 → 应用 → Cookie，复制 SESSDATA 的值。不填则字幕列表为空。',
+    'settings.bilibili.transcriptLanguage.name': '字幕文稿语言',
+    'settings.bilibili.transcriptLanguage.desc':
+        '首选字幕语言代码（例如 “zh-CN”、“en”）。留空则优先选择人工字幕而非 AI 字幕，若无则使用第一个可用字幕。',
+    'settings.bilibili.transcriptLine.name': 'Bilibili 字幕文稿行模板',
+    'settings.bilibili.transcriptLine.desc':
+        '每行字幕文稿的模板。可用变量：transcriptTimestamp、transcriptText、transcriptSeconds、transcriptUrl。',
+    'settings.bilibili.transcriptLinesPerBlock.name': 'Bilibili 每个字幕文稿块的字幕行数',
+    'settings.bilibili.transcriptLinesPerBlock.desc': '归入一个带时间戳的字幕文稿块中的字幕行数。',
 
     // Settings — Nonreadable Article
     'settings.nonReadableArticle.slug.name': '不可读内容类型标识',

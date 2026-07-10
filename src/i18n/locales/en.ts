@@ -107,6 +107,21 @@ const en: Record<string, string> = {
     'settings.bilibili.template.name': 'Bilibili note template',
     'settings.bilibili.embedWidth.name': 'Bilibili embed player width',
     'settings.bilibili.embedHeight.name': 'Bilibili embed player height',
+    'settings.bilibili.fetchTranscript.name': 'Fetch video transcript',
+    'settings.bilibili.fetchTranscript.desc':
+        'If enabled, the video subtitles are fetched and made available as the {{ videoTranscript }} template variable. Bilibili only returns subtitles to logged-in requests, so a SESSDATA cookie is required (see below).',
+    'settings.bilibili.sessdata.name': 'SESSDATA cookie',
+    'settings.bilibili.sessdata.desc':
+        'Your Bilibili SESSDATA cookie value. Log in at bilibili.com in a browser, open developer tools → Application → Cookies, and copy the SESSDATA value. Without it the subtitle list comes back empty.',
+    'settings.bilibili.transcriptLanguage.name': 'Transcript language',
+    'settings.bilibili.transcriptLanguage.desc':
+        'Preferred subtitle language code (e.g. "zh-CN", "en"). Leave empty to prefer a human track over an AI-generated one, falling back to the first available.',
+    'settings.bilibili.transcriptLine.name': 'Bilibili transcript line template',
+    'settings.bilibili.transcriptLine.desc':
+        'Template for each transcript line. Available variables: transcriptTimestamp, transcriptText, transcriptSeconds, transcriptUrl.',
+    'settings.bilibili.transcriptLinesPerBlock.name': 'Bilibili transcript caption lines per block',
+    'settings.bilibili.transcriptLinesPerBlock.desc':
+        'Number of caption lines grouped into one timestamped transcript block.',
 
     // Settings — Nonreadable Article
     'settings.nonReadableArticle.slug.name': 'Nonreadable content type slug',

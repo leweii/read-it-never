@@ -13,6 +13,8 @@ enum DetailsItem {
     YoutubeChannel = 'youtubeChannel',
     X = 'x',
     Bilibili = 'bilibili',
+    Xiaoyuzhou = 'xiaoyuzhou',
+    Podcast = 'podcast',
     NonReadableArticle = 'nonReadableArticle',
     TextSnippet = 'textSnippet',
 }
@@ -707,6 +709,108 @@ export class ReadItNeverSettingsTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     }),
             );
+
+        containerEl.createEl('hr', { cls: 'readitnever-setting-hr' });
+        detailsEl = this.createDetailsElement(containerEl, DetailsItem.Xiaoyuzhou);
+        detailsEl.createEl('summary', {
+            text: 'Xiaoyuzhou',
+            cls: 'readitnever-setting-h3',
+        });
+
+        new Setting(detailsEl)
+            .setName(t('settings.xiaoyuzhou.slug.name'))
+            .setDesc(this.createTemplateVariableReferenceDiv())
+            .addText((text) =>
+                text
+                    .setPlaceholder(DEFAULT_SETTINGS.xiaoyuzhouContentTypeSlug)
+                    .setValue(
+                        typeof this.plugin.settings.xiaoyuzhouContentTypeSlug === 'undefined'
+                            ? DEFAULT_SETTINGS.xiaoyuzhouContentTypeSlug
+                            : this.plugin.settings.xiaoyuzhouContentTypeSlug,
+                    )
+                    .onChange(async (value) => {
+                        this.plugin.settings.xiaoyuzhouContentTypeSlug = value;
+                        await this.plugin.saveSettings();
+                    }),
+            );
+
+        new Setting(detailsEl)
+            .setName(t('settings.xiaoyuzhou.title.name'))
+            .setDesc(this.createTemplateVariableReferenceDiv())
+            .addText((text) =>
+                text
+                    .setPlaceholder(DEFAULT_SETTINGS.xiaoyuzhouNoteTitle)
+                    .setValue(this.plugin.settings.xiaoyuzhouNoteTitle || DEFAULT_SETTINGS.xiaoyuzhouNoteTitle)
+                    .onChange(async (value) => {
+                        this.plugin.settings.xiaoyuzhouNoteTitle = value;
+                        await this.plugin.saveSettings();
+                    }),
+            );
+
+        new Setting(detailsEl)
+            .setName(t('settings.xiaoyuzhou.template.name'))
+            .setDesc(this.createTemplateVariableReferenceDiv())
+            .addTextArea((textarea) => {
+                textarea
+                    .setValue(this.plugin.settings.xiaoyuzhouNote || DEFAULT_SETTINGS.xiaoyuzhouNote)
+                    .onChange(async (value) => {
+                        this.plugin.settings.xiaoyuzhouNote = value;
+                        await this.plugin.saveSettings();
+                    });
+                textarea.inputEl.rows = 10;
+                textarea.inputEl.cols = 25;
+            });
+
+        containerEl.createEl('hr', { cls: 'readitnever-setting-hr' });
+        detailsEl = this.createDetailsElement(containerEl, DetailsItem.Podcast);
+        detailsEl.createEl('summary', {
+            text: t('settings.section.podcast'),
+            cls: 'readitnever-setting-h3',
+        });
+
+        new Setting(detailsEl)
+            .setName(t('settings.podcast.slug.name'))
+            .setDesc(this.createTemplateVariableReferenceDiv())
+            .addText((text) =>
+                text
+                    .setPlaceholder(DEFAULT_SETTINGS.podcastContentTypeSlug)
+                    .setValue(
+                        typeof this.plugin.settings.podcastContentTypeSlug === 'undefined'
+                            ? DEFAULT_SETTINGS.podcastContentTypeSlug
+                            : this.plugin.settings.podcastContentTypeSlug,
+                    )
+                    .onChange(async (value) => {
+                        this.plugin.settings.podcastContentTypeSlug = value;
+                        await this.plugin.saveSettings();
+                    }),
+            );
+
+        new Setting(detailsEl)
+            .setName(t('settings.podcast.title.name'))
+            .setDesc(this.createTemplateVariableReferenceDiv())
+            .addText((text) =>
+                text
+                    .setPlaceholder(DEFAULT_SETTINGS.podcastNoteTitle)
+                    .setValue(this.plugin.settings.podcastNoteTitle || DEFAULT_SETTINGS.podcastNoteTitle)
+                    .onChange(async (value) => {
+                        this.plugin.settings.podcastNoteTitle = value;
+                        await this.plugin.saveSettings();
+                    }),
+            );
+
+        new Setting(detailsEl)
+            .setName(t('settings.podcast.template.name'))
+            .setDesc(this.createTemplateVariableReferenceDiv())
+            .addTextArea((textarea) => {
+                textarea
+                    .setValue(this.plugin.settings.podcastNote || DEFAULT_SETTINGS.podcastNote)
+                    .onChange(async (value) => {
+                        this.plugin.settings.podcastNote = value;
+                        await this.plugin.saveSettings();
+                    });
+                textarea.inputEl.rows = 10;
+                textarea.inputEl.cols = 25;
+            });
 
         containerEl.createEl('hr', { cls: 'readitnever-setting-hr' });
         detailsEl = this.createDetailsElement(containerEl, DetailsItem.NonReadableArticle);

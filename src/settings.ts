@@ -35,6 +35,12 @@ export interface ReadItNeverSettings {
     twitterContentTypeSlug: string;
     twitterNoteTitle: string;
     twitterNote: string;
+    xiaoyuzhouContentTypeSlug: string;
+    xiaoyuzhouNoteTitle: string;
+    xiaoyuzhouNote: string;
+    podcastContentTypeSlug: string;
+    podcastNoteTitle: string;
+    podcastNote: string;
     parseableArticleContentType: string;
     parseableArticleNoteTitle: string;
     parsableArticleNote: string;
@@ -91,6 +97,14 @@ export const DEFAULT_SETTINGS: ReadItNeverSettings = {
     twitterContentTypeSlug: 'xcom',
     twitterNoteTitle: 'Tweet-{{ date }}-{{ tweetAuthorName }}',
     twitterNote: '#ReadItNever [[Tweet]]\n\n# [{{ tweetAuthorName }}]({{ tweetURL }})\n\n{{ tweetContent }}',
+    xiaoyuzhouContentTypeSlug: 'xiaoyuzhou',
+    xiaoyuzhouNoteTitle: 'Podcast-{{ date }}-{{ title }}',
+    xiaoyuzhouNote:
+        '#ReadItNever [[Podcast]]\n\n# [{{ episodeTitle }}]({{ episodeURL }})\n\n{{ episodePlayer }}\n\n[{{ podcastName }}]({{ podcastURL }}) · {{ episodePublishDate }} · {{ episodeDurationFormatted }}\n\n## Shownotes\n\n{{ episodeDescription }}',
+    podcastContentTypeSlug: 'podcast',
+    podcastNoteTitle: 'Podcast-{{ date }}-{{ title }}',
+    podcastNote:
+        '#ReadItNever [[Podcast]]\n\n# [{{ episodeTitle }}]({{ episodeURL }})\n\n{{ episodePlayer }}\n\n**{{ podcastName }}** · {{ episodePublishDate }} · {{ episodeDurationFormatted }}\n\n## Shownotes\n\n{{ episodeDescription }}',
     parseableArticleContentType: 'article',
     parseableArticleNoteTitle: 'Art-{{ date }}-{{ title }}',
     parsableArticleNote: '#ReadItNever [[Article]]\n\n# [{{ articleTitle }}]({{ articleURL }})\n\n{{ articleContent }}',

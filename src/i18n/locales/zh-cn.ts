@@ -121,6 +121,17 @@ const zhCN: Record<string, string> = {
     'settings.bilibili.transcriptLinesPerBlock.name': 'Bilibili 每个字幕文稿块的字幕行数',
     'settings.bilibili.transcriptLinesPerBlock.desc': '归入一个带时间戳的字幕文稿块中的字幕行数。',
 
+    // Settings — Xiaoyuzhou
+    'settings.xiaoyuzhou.slug.name': '小宇宙内容类型标识',
+    'settings.xiaoyuzhou.title.name': '小宇宙笔记标题模板',
+    'settings.xiaoyuzhou.template.name': '小宇宙笔记模板',
+
+    // Settings — Podcast (通用 RSS 订阅源)
+    'settings.section.podcast': '播客（RSS 订阅源）',
+    'settings.podcast.slug.name': '播客内容类型标识',
+    'settings.podcast.title.name': '播客笔记标题模板',
+    'settings.podcast.template.name': '播客笔记模板',
+
     // Settings — Nonreadable Article
     'settings.nonReadableArticle.slug.name': '不可读内容类型标识',
     'settings.nonReadableArticle.title.name': '不可读文章笔记标题模板',

@@ -3,6 +3,8 @@ import { DEFAULT_SETTINGS, ReadItNeverSettingValue, ReadItNeverSettings } from '
 import { ReadItNeverSettingsTab } from './views/settings-tab';
 import YoutubeParser from './parsers/YoutubeParser';
 import BilibiliParser from './parsers/BilibiliParser';
+import XiaoyuzhouParser from './parsers/XiaoyuzhouParser';
+import PodcastParser from './parsers/PodcastParser';
 import TwitterParser from './parsers/TwitterParser';
 import WebsiteParser from './parsers/WebsiteParser';
 import TextSnippetParser from './parsers/TextSnippetParser';
@@ -46,6 +48,8 @@ export default class ReadItNeverPlugin extends Plugin {
             new YoutubeParser(this.app, this, this.templateEngine),
             new YoutubeChannelParser(this.app, this, this.templateEngine),
             new BilibiliParser(this.app, this, this.templateEngine),
+            new XiaoyuzhouParser(this.app, this, this.templateEngine),
+            new PodcastParser(this.app, this, this.templateEngine),
             new TwitterParser(this.app, this, this.templateEngine),
             new GithubParser(this.app, this, this.templateEngine),
             new WikipediaParser(this.app, this, this.templateEngine),

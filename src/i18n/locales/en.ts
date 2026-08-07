@@ -123,6 +123,17 @@ const en: Record<string, string> = {
     'settings.bilibili.transcriptLinesPerBlock.desc':
         'Number of caption lines grouped into one timestamped transcript block.',
 
+    // Settings — Xiaoyuzhou
+    'settings.xiaoyuzhou.slug.name': 'Xiaoyuzhou content type slug',
+    'settings.xiaoyuzhou.title.name': 'Xiaoyuzhou note template title',
+    'settings.xiaoyuzhou.template.name': 'Xiaoyuzhou note template',
+
+    // Settings — Podcast (generic RSS feed)
+    'settings.section.podcast': 'Podcast (RSS feed)',
+    'settings.podcast.slug.name': 'Podcast content type slug',
+    'settings.podcast.title.name': 'Podcast note template title',
+    'settings.podcast.template.name': 'Podcast note template',
+
     // Settings — Nonreadable Article
     'settings.nonReadableArticle.slug.name': 'Nonreadable content type slug',
     'settings.nonReadableArticle.title.name': 'Nonreadable article note template title',

@@ -27,15 +27,57 @@ export function getBaseUrl(url: string, origin: string): string {
     return baseURL.href;
 }
 
+const FALLBACK_FILENAME = 'Untitled';
+
+/**
+ * Removes characters that are invalid in file names on any supported platform or that break
+ * Obsidian wikilinks (`[`, `]`, `#`, `^`, `|`), collapses whitespace and strips leading/trailing
+ * dots and spaces (Windows rejects trailing ones, leading dots create hidden files).
+ */
 export function normalizeFilename(fileName: string, preserveUnicode = true): string {
-    if (preserveUnicode) {
-        return fileName.replace(/[:#/\\|?*<>"]/g, '');
+    // Control characters (newlines, tabs, ...) are invalid in file names on Windows.
+    /* eslint-disable no-control-regex */
+    const forbidden = preserveUnicode
+        ? /[:#/\\|?*<>"[\]^\u0000-\u001F\u007F]/gu
+        : /[:#/\\()|?*<>"[\]^\u0000-\u001F\u007F\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{1F100}-\u{1F64F}\u{1F680}-\u{1F6FF}]/gu;
+    /* eslint-enable no-control-regex */
+
+    const normalized = fileName
+        .replace(/\s+/g, ' ')
+        .replace(forbidden, '')
+        .replace(/^[\s.]+|[\s.]+$/g, '');
+
+    return normalized === '' ? FALLBACK_FILENAME : normalized;
+}
+
+/**
+ * Length of a string in UTF-8 bytes. Most file systems (ext4, APFS, Android) limit file names to
+ * 255 bytes rather than 255 characters, and a CJK character takes three bytes.
+ */
+export function byteLength(value: string): number {
+    return new TextEncoder().encode(value).length;
+}
+
+/**
+ * Truncates a string so it fits in `maxBytes` UTF-8 bytes without splitting a code point.
+ */
+export function truncateToByteLength(value: string, maxBytes: number): string {
+    if (byteLength(value) <= maxBytes) {
+        return value;
     }
 
-    return fileName.replace(
-        /[:#/\\()|?*<>"[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{1F100}-\u{1F64F}\u{1F680}-\u{1F6FF}]/gu,
-        '',
-    );
+    let result = '';
+    let bytes = 0;
+    for (const char of value) {
+        const charBytes = byteLength(char);
+        if (bytes + charBytes > maxBytes) {
+            break;
+        }
+        result += char;
+        bytes += charBytes;
+    }
+
+    return result;
 }
 
 export function getOsOptimizedPath(
@@ -44,25 +86,24 @@ export function getOsOptimizedPath(
     dataAdapter: CapacitorAdapter | FileSystemAdapter,
     filesystemLimits: FilesystemLimits,
 ): string {
-    const fileExtension = `.${getFileExtension(fileName)}`;
+    const extension = getFileExtension(fileName);
+    const fileExtension = extension === '' ? '' : `.${extension}`;
+    let baseName = fileName.substring(0, fileName.length - fileExtension.length);
 
-    let optimizedFileName = fileName;
-    if (optimizedFileName.length > filesystemLimits.fileName) {
-        optimizedFileName =
-            optimizedFileName.substring(0, filesystemLimits.fileName - fileExtension.length) + `${fileExtension}`;
+    // Limits are measured in UTF-8 bytes so that long CJK titles don't exceed the file system limit.
+    const maxBaseNameBytes = filesystemLimits.fileName - byteLength(fileExtension);
+    baseName = truncateToByteLength(baseName, maxBaseNameBytes).trimEnd();
+
+    const directory = normalizePath(path);
+    const fullPathOverflow =
+        byteLength(dataAdapter.getFullPath(normalizePath(`${directory}/${baseName}${fileExtension}`))) -
+        filesystemLimits.path;
+    if (fullPathOverflow > 0) {
+        // Only shorten the file name itself, never the directory part of the path.
+        baseName = truncateToByteLength(baseName, Math.max(1, byteLength(baseName) - fullPathOverflow)).trimEnd();
     }
 
-    let optimizedFilePath = normalizePath(`${path}/${optimizedFileName}`);
-    const fullPath = dataAdapter.getFullPath(optimizedFilePath);
-    if (fullPath.length > filesystemLimits.path) {
-        optimizedFilePath =
-            optimizedFilePath.substring(
-                0,
-                optimizedFilePath.length - (fullPath.length - filesystemLimits.path) - fileExtension.length,
-            ) + `${fileExtension}`;
-    }
-
-    return optimizedFilePath;
+    return normalizePath(`${directory}/${baseName}${fileExtension}`);
 }
 
 export function getFileSystemLimits(platform: typeof Platform, settings: ReadItNeverSettings): FilesystemLimits {

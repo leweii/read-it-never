@@ -1,4 +1,4 @@
-import { Editor, Menu, MenuItem, Platform, Plugin, addIcon } from 'obsidian';
+import { Editor, Menu, MenuItem, Notice, Platform, Plugin, addIcon } from 'obsidian';
 import { DEFAULT_SETTINGS, ReadItNeverSettingValue, ReadItNeverSettings } from './settings';
 import { ReadItNeverSettingsTab } from './views/settings-tab';
 import YoutubeParser from './parsers/YoutubeParser';
@@ -25,14 +25,14 @@ export default class ReadItNeverPlugin extends Plugin {
     public api: ReadItNeverApi;
     public settings: ReadItNeverSettings;
 
-    private fileSystemLimits: FilesystemLimits;
     private noteService: NoteService;
     private parserCreator: ParserCreator;
     private templateEngine: TemplateEngine;
     private vaultRepository: VaultRepository;
 
     getFileSystemLimits(): FilesystemLimits {
-        return this.fileSystemLimits;
+        // Computed on demand so changes in the settings apply without reloading the plugin.
+        return getFileSystemLimits(Platform, this.settings);
     }
 
     getVaultRepository(): VaultRepository {
@@ -42,7 +42,6 @@ export default class ReadItNeverPlugin extends Plugin {
     async onload(): Promise<void> {
         await this.loadSettings();
 
-        this.fileSystemLimits = getFileSystemLimits(Platform, this.settings);
         this.templateEngine = new TemplateEngine();
         this.parserCreator = new ParserCreator([
             new YoutubeParser(this.app, this, this.templateEngine),
@@ -62,32 +61,27 @@ export default class ReadItNeverPlugin extends Plugin {
 
         addIcon('read-it-never', clipboardIcon);
 
-        this.addRibbonIcon('read-it-never', t('ribbon.createFromClipboard'), async () => {
-            await this.api.processContent(await this.getTextClipboardContent());
-        });
+        this.addRibbonIcon('read-it-never', t('ribbon.createFromClipboard'), () =>
+            this.withClipboardContent((content) => this.api.processContent(content)),
+        );
 
         this.addCommand({
             id: 'save-clipboard-to-notice',
             name: t('command.createFromClipboard'),
-            callback: async () => {
-                await this.api.processContent(await this.getTextClipboardContent());
-            },
+            callback: () => this.withClipboardContent((content) => this.api.processContent(content)),
         });
 
         this.addCommand({
             id: 'create-from-clipboard-batch',
             name: t('command.createFromClipboardBatch'),
-            callback: async () => {
-                await this.api.processContentBatch(await this.getTextClipboardContent());
-            },
+            callback: () => this.withClipboardContent((content) => this.api.processContentBatch(content)),
         });
 
         this.addCommand({
             id: 'insert-at-cursor',
             name: t('command.insertAtCursor'),
-            editorCallback: async (editor: Editor) => {
-                await this.api.insertContentAtEditorCursorPosition(await this.getTextClipboardContent(), editor);
-            },
+            editorCallback: (editor: Editor) =>
+                this.withClipboardContent((content) => this.api.insertContentAtEditorCursorPosition(content, editor)),
         });
 
         this.addSettingTab(new ReadItNeverSettingsTab(this.app, this));
@@ -134,6 +128,22 @@ export default class ReadItNeverPlugin extends Plugin {
 
     async getTextClipboardContent(): Promise<string> {
         return await navigator.clipboard.readText();
+    }
+
+    /**
+     * Reads the clipboard and runs `action` with its text; shows a notice if the clipboard can't be read
+     * (e.g. permission denied on mobile).
+     */
+    private async withClipboardContent(action: (content: string) => Promise<void>): Promise<void> {
+        let content: string;
+        try {
+            content = await this.getTextClipboardContent();
+        } catch (error) {
+            console.error(error);
+            new Notice(t('notice.clipboardUnavailable'));
+            return;
+        }
+        await action(content);
     }
 }
 

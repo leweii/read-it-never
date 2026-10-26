@@ -1,7 +1,7 @@
-import { Notice, Platform, RequestUrlResponse, requestUrl } from 'obsidian';
+import { Notice, Platform, requestUrl } from 'obsidian';
 import { Readability, isProbablyReaderable } from '@mozilla/readability';
 import DOMPurify from 'isomorphic-dompurify';
-import { Note } from './Note';
+import { Note, NoteContentProcessor } from './Note';
 import { Parser } from './Parser';
 import { parseHtmlContent } from './parsehtml';
 import { getBaseUrl, normalizeFilename } from 'src/helpers/fileutils';
@@ -37,6 +37,8 @@ type WebsiteNoteData = {
     articleMetaAuthor: string;
     articlePublishedTime: string;
 };
+
+const CJK_CHARACTERS_PER_MINUTE = 400;
 
 class WebsiteParser extends Parser {
     test(url: string): boolean {
@@ -150,7 +152,7 @@ class WebsiteParser extends Parser {
 
         document.body.querySelectorAll('[class*=highlight-text],[class*=highlight-source]')?.forEach((codeSource) => {
             const language = codeSource.className.match(/highlight-(?:text|source)-([a-z0-9]+)/)?.[1];
-            if (codeSource.firstElementChild.nodeName == 'PRE') {
+            if (language && codeSource.firstElementChild?.nodeName === 'PRE') {
                 codeSource.removeAttribute('data-snippet-clipboard-copy-content');
                 codeSource.firstElementChild.id = `code-lang-${language}`;
             }
@@ -158,11 +160,13 @@ class WebsiteParser extends Parser {
 
         document.body.querySelectorAll('[class*=language-]')?.forEach((codeSource) => {
             const language = codeSource.className.match(/language-([a-z0-9]+)/)?.[1];
-            codeSource.id = `code-lang-${language}`;
+            if (language) {
+                codeSource.id = `code-lang-${language}`;
+            }
         });
 
         document.body.querySelectorAll('.codehilite > pre')?.forEach((codeSource) => {
-            if (codeSource.firstChild.nodeName !== 'CODE' && !codeSource.className.includes('language')) {
+            if (codeSource.firstChild?.nodeName !== 'CODE' && !codeSource.className.includes('language')) {
                 codeSource.id = 'code-lang-text';
             }
         });
@@ -174,14 +178,13 @@ class WebsiteParser extends Parser {
                 return;
             }
 
-            figure.querySelector('.image-link').remove();
+            figure.querySelector('.image-link')?.remove();
             figure.prepend(imgEl);
         });
 
         //fix for Readability removing <figure> elements in <div>
         document.body.querySelectorAll('div > figure')?.forEach((figure) => {
-            const figureEl = figure;
-            figure.parentElement.before(figureEl);
+            figure.parentElement?.before(figure);
         });
 
         //fix for WeChat site (https://github.com/DominikPieper/obsidian-ReadItNever/issues/187)
@@ -201,23 +204,15 @@ class WebsiteParser extends Parser {
             date: this.getFormattedDateForFilename(createdAt),
         });
 
-        let processedContent = this.templateEngine.render(this.plugin.settings.parsableArticleNote, data);
-
-        if (this.plugin.settings.downloadImages && Platform.isDesktop) {
-            processedContent = await replaceImages(
-                this.plugin,
-                normalizeFilename(fileNameTemplate),
-                processedContent,
-                this.getAssetsDir(fileNameTemplate, createdAt),
-            );
-        }
+        const content = this.templateEngine.render(this.plugin.settings.parsableArticleNote, data);
 
         return new Note(
             fileNameTemplate,
             'md',
-            processedContent,
+            content,
             this.plugin.settings.parseableArticleContentType,
             createdAt,
+            this.getImageProcessor(fileNameTemplate, createdAt, this.plugin.settings.parseableArticleContentType),
         );
     }
 
@@ -227,9 +222,9 @@ class WebsiteParser extends Parser {
         createdAt: Date,
         ogData?: { title?: string; description?: string; siteName?: string },
     ): Promise<Note> {
-        console.error('Website not parseable');
+        console.warn(`Read It Never: ${url} is not parseable, saving link only.`);
 
-        let content = this.templateEngine.render(this.plugin.settings.notParsableArticleNote, {
+        const content = this.templateEngine.render(this.plugin.settings.notParsableArticleNote, {
             articleURL: url,
             previewURL: previewUrl ?? '',
             articleTitle: ogData?.title ?? '',
@@ -239,16 +234,8 @@ class WebsiteParser extends Parser {
 
         const fileNameTemplate = this.templateEngine.render(this.plugin.settings.notParseableArticleNoteTitle, {
             date: this.getFormattedDateForFilename(createdAt),
+            title: ogData?.title || new URL(url).hostname,
         });
-
-        if (this.plugin.settings.downloadImages && Platform.isDesktop) {
-            content = await replaceImages(
-                this.plugin,
-                normalizeFilename(fileNameTemplate),
-                content,
-                this.getAssetsDir(fileNameTemplate, createdAt),
-            );
-        }
 
         return new Note(
             fileNameTemplate,
@@ -256,6 +243,7 @@ class WebsiteParser extends Parser {
             content,
             this.plugin.settings.notParseableArticleContentType,
             createdAt,
+            this.getImageProcessor(fileNameTemplate, createdAt, this.plugin.settings.notParseableArticleContentType),
         );
     }
 
@@ -272,7 +260,20 @@ class WebsiteParser extends Parser {
         return previewMetaElement?.getAttribute('content');
     }
 
-    protected getAssetsDir(fileName: string, createdAt: Date): string {
+    /**
+     * Returns a processor downloading remote images into the vault, or `null` if disabled.
+     * Runs only once the note is about to be written, so skipped notes leave no orphaned images.
+     */
+    protected getImageProcessor(fileName: string, createdAt: Date, contentType: string): NoteContentProcessor | null {
+        if (!this.plugin.settings.downloadImages || !Platform.isDesktop) {
+            return null;
+        }
+
+        const assetsDir = this.getAssetsDir(fileName, createdAt, contentType);
+        return (content: string) => replaceImages(this.plugin, normalizeFilename(fileName), content, assetsDir);
+    }
+
+    protected getAssetsDir(fileName: string, createdAt: Date, contentType: string): string {
         if (this.plugin.settings.downloadImagesInArticleDir) {
             const assetsDir = this.templateEngine.render(this.plugin.settings.assetsDir, {
                 date: '',
@@ -285,7 +286,7 @@ class WebsiteParser extends Parser {
         return this.templateEngine.render(this.plugin.settings.assetsDir, {
             date: this.getFormattedDateForFilename(createdAt),
             fileName: normalizeFilename(fileName),
-            contentType: this.plugin.settings.parseableArticleContentType,
+            contentType,
         });
     }
 
@@ -293,17 +294,26 @@ class WebsiteParser extends Parser {
      * Returns estimated reading time of article in minutes
      */
     private getEstimatedReadingTime(article: ReadabilityArticle): number {
-        const readingSpeed = this.getReadingSpeed(article.lang || 'en');
-        const words = article.textContent.trim().split(/\s+/).length;
+        const text = article.textContent.trim();
 
-        return Math.ceil(words / readingSpeed);
+        // CJK text has no spaces between words; count characters instead (~400 characters/minute).
+        const cjkCharacters = text.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/g)?.length ?? 0;
+        const otherWords = text
+            .replace(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/g, ' ')
+            .split(/\s+/)
+            .filter((word) => word !== '').length;
+
+        const lang = (article.lang || 'en').toLowerCase().split('-')[0];
+        const minutes = cjkCharacters / CJK_CHARACTERS_PER_MINUTE + otherWords / this.getReadingSpeed(lang);
+
+        return Math.max(1, Math.ceil(minutes));
     }
 
     /**
      * Reading speed in words per minute. Data are gathered from this study https://irisreading.com/average-reading-speed-in-various-languages/
      */
     private getReadingSpeed(lang: string): number {
-        const readingSpeed = new Map([
+        const readingSpeed = new Map<string, number>([
             ['en', 228],
             ['ar', 138],
             ['de', 179],
@@ -327,48 +337,58 @@ class WebsiteParser extends Parser {
         return readingSpeed.get(lang) || readingSpeed.get('en');
     }
 
-    private async parseHtmlDom(url: URL, charsetOverride: string | null = null): Promise<Document> {
+    private async parseHtmlDom(url: URL): Promise<Document> {
         const response = await requestUrl({
             method: 'GET',
             url: url.href,
             headers: { ...desktopBrowserUserAgent },
         });
 
-        const charset: string = charsetOverride ?? this.getCharsetFromResponseHeader(response);
-
         const buffer = response.arrayBuffer;
-        const decoder = new TextDecoder(charset);
-        const text = decoder.decode(buffer);
+        const headerCharset = this.getCharsetFromContentType(response.headers?.['content-type']);
+        const document = this.decodeHtml(buffer, headerCharset ?? 'utf-8');
 
-        const parser = new DOMParser();
-        const document = parser.parseFromString(text, 'text/html');
-
-        // Double-check meta tags for charset
-        const metaCharset = document.querySelector('meta[charset], meta[http-equiv="Content-Type"]');
-        if (metaCharset) {
-            const docCharset =
-                metaCharset.getAttribute('charset') ||
-                metaCharset.getAttribute('content')?.match(/charset=([^;]+)/i)?.[1];
-            if (docCharset && docCharset !== charset) {
-                // If different charset found in meta, re-decode
-                return this.parseHtmlDom(url, docCharset);
+        // Without a charset in the response header, honour the one declared in the document. The
+        // response body is re-decoded locally; no second request is made.
+        if (headerCharset === null) {
+            const metaCharset = document.querySelector('meta[charset], meta[http-equiv="Content-Type" i]');
+            const documentCharset = this.normalizeCharset(
+                metaCharset?.getAttribute('charset') ??
+                    this.getCharsetFromContentType(metaCharset?.getAttribute('content')),
+            );
+            if (documentCharset !== null && documentCharset !== 'utf-8') {
+                return this.decodeHtml(buffer, documentCharset);
             }
         }
 
         return document;
     }
 
-    private getCharsetFromResponseHeader(response: RequestUrlResponse): string {
-        const contentType = response.headers?.['content-type'];
-        let charset = 'UTF-8';
-
-        // Try to extract charset from content-type header
-        const charsetMatch = contentType?.match(/charset=([^;]+)/i);
-        if (charsetMatch) {
-            charset = charsetMatch[1];
+    private decodeHtml(buffer: ArrayBuffer, charset: string): Document {
+        let decoder: TextDecoder;
+        try {
+            decoder = new TextDecoder(charset);
+        } catch {
+            // Unknown encoding label; fall back to UTF-8 rather than failing the whole note.
+            decoder = new TextDecoder('utf-8');
         }
 
-        return charset;
+        return new DOMParser().parseFromString(decoder.decode(buffer), 'text/html');
+    }
+
+    private getCharsetFromContentType(contentType: string | null | undefined): string | null {
+        return this.normalizeCharset(contentType?.match(/charset\s*=\s*([^;]+)/i)?.[1]);
+    }
+
+    private normalizeCharset(charset: string | null | undefined): string | null {
+        const normalized = charset
+            ?.trim()
+            .replace(/^["']|["']$/g, '')
+            .toLowerCase();
+        if (!normalized) {
+            return null;
+        }
+        return normalized === 'utf8' ? 'utf-8' : normalized;
     }
 }
 

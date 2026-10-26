@@ -1,7 +1,15 @@
 import TurndownService from 'turndown';
 import * as turndownPluginGfm from '@guyplusplus/turndown-plugin-gfm';
 
+// Turndown rules are stateless, so a single configured instance is shared across conversions.
+let sharedTurndownService: TurndownService | null = null;
+
 export function parseHtmlContent(content: string): Promise<string> {
+    sharedTurndownService ??= createTurndownService();
+    return Promise.resolve(sharedTurndownService.turndown(content));
+}
+
+function createTurndownService(): TurndownService {
     const gfm = (turndownPluginGfm as { gfm: TurndownService.Plugin }).gfm;
     const turndownService = new TurndownService({
         headingStyle: 'atx',
@@ -17,8 +25,8 @@ export function parseHtmlContent(content: string): Promise<string> {
         filter: (node) => {
             return (
                 node.nodeName === 'PRE' &&
-                node.firstChild.nodeName === 'CODE' &&
-                node.firstChild.firstChild.nodeName === 'P'
+                node.firstChild?.nodeName === 'CODE' &&
+                node.firstChild.firstChild?.nodeName === 'P'
             );
         },
         replacement: function (_content, node, options) {
@@ -30,7 +38,7 @@ export function parseHtmlContent(content: string): Promise<string> {
             return (
                 '\n\n' +
                 options.fence +
-                codeNode.getAttribute('data-lang') +
+                (codeNode.getAttribute('data-lang') ?? '') +
                 '\n' +
                 codeNode.textContent +
                 '\n' +
@@ -74,7 +82,5 @@ export function parseHtmlContent(content: string): Promise<string> {
         },
     });
 
-    const articleContent = turndownService.turndown(content);
-
-    return Promise.resolve(articleContent);
+    return turndownService;
 }

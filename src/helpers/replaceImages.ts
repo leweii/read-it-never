@@ -4,13 +4,17 @@ import { createRandomString } from './stringUtils';
 import { HTTPS_PROTOCOL, HTTP_PROTOCOL } from 'src/constants/urlProtocols';
 import ReadItNeverPlugin from 'src/main';
 
-type Replacer = {
-    (match: string, anchor: string, link: string): Promise<string>;
-};
-
-const EXTERNAL_MEDIA_LINK_PATTERN = /!\[(?<anchor>.*?)\]\((?<link>.+?)\)/g;
+// Matches `![anchor](link)` and `![anchor](link "title")`.
+const EXTERNAL_MEDIA_LINK_PATTERN = /!\[(?<anchor>[^\]]*?)\]\((?<link>[^\s)]+)(?:\s+"[^"]*")?\)/g;
 const CREATE_FILENAME_ATTEMPTS = 5;
 const MAX_FILENAME_INDEX = 1000;
+const MAX_CONCURRENT_DOWNLOADS = 4;
+
+interface ImageMatch {
+    match: string;
+    anchor: string;
+    link: string;
+}
 
 export async function replaceImages(
     plugin: ReadItNeverPlugin,
@@ -18,72 +22,83 @@ export async function replaceImages(
     content: string,
     assetsDir: string,
 ): Promise<string> {
-    return await replaceAsync(content, EXTERNAL_MEDIA_LINK_PATTERN, imageTagProcessor(plugin, noteFileName, assetsDir));
+    const matches: ImageMatch[] = Array.from(content.matchAll(EXTERNAL_MEDIA_LINK_PATTERN)).map((match) => ({
+        match: match[0],
+        anchor: match.groups?.anchor ?? '',
+        link: match.groups?.link ?? '',
+    }));
+
+    const downloadable = matches.filter((image) => isValidUrl(image.link, [HTTP_PROTOCOL, HTTPS_PROTOCOL]));
+    if (downloadable.length === 0) {
+        return content;
+    }
+
+    // Create the directory once up front instead of racing per image.
+    await plugin.getVaultRepository().createDirectory(assetsDir);
+
+    // The same image is often referenced several times (e.g. preview image + inline); download once.
+    const uniqueLinks = Array.from(new Set(downloadable.map((image) => image.link)));
+    const localPaths = new Map<string, string | null>();
+
+    await runWithConcurrency(uniqueLinks, MAX_CONCURRENT_DOWNLOADS, async (link) => {
+        localPaths.set(link, await downloadImageToVault(plugin, noteFileName, assetsDir, link));
+    });
+
+    return content.replace(EXTERNAL_MEDIA_LINK_PATTERN, (match: string, anchor: string, link: string) => {
+        const localPath = localPaths.get(link);
+        return localPath ? `![${anchor}](${localPath})` : match;
+    });
 }
 
-async function replaceAsync(content: string, searchValue: string | RegExp, replacer: Replacer): Promise<string> {
+async function runWithConcurrency<T>(items: T[], limit: number, worker: (item: T) => Promise<void>): Promise<void> {
+    let index = 0;
+    const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+        while (index < items.length) {
+            const item = items[index++];
+            await worker(item);
+        }
+    });
+    await Promise.all(runners);
+}
+
+/**
+ * Downloads an image and stores it in the assets directory. Returns the link to use in markdown, or
+ * `null` when the image could not be downloaded (the original remote link is kept in that case).
+ */
+async function downloadImageToVault(
+    plugin: ReadItNeverPlugin,
+    noteFileName: string,
+    assetsDir: string,
+    link: string,
+): Promise<string | null> {
     try {
-        if (typeof replacer === 'function') {
-            // 1. Run fake pass of `replace`, collect values from `replacer` calls
-            // 2. Resolve them with `Promise.all`
-            // 3. Run `replace` with resolved values
-            const values: Promise<string>[] = [];
-            content.replace(searchValue, (match: string, anchor: string, link: string) => {
-                values.push(replacer(match, anchor, link));
-                return '';
-            });
-            return Promise.all(values).then((resolvedValues) =>
-                content.replace(searchValue, () => resolvedValues.shift() ?? ''),
-            );
-        } else {
-            return Promise.resolve(content.replace(searchValue, replacer as unknown as string));
+        const { fileContent, fileExtension } = await downloadImage(new URL(link));
+
+        for (let attempt = 0; attempt < CREATE_FILENAME_ATTEMPTS; attempt++) {
+            try {
+                const fileName = await chooseFileName(
+                    plugin.app.vault.adapter,
+                    plugin.getFileSystemLimits(),
+                    assetsDir,
+                    noteFileName,
+                    fileExtension,
+                );
+
+                if (fileName === '') {
+                    return null;
+                }
+
+                await plugin.app.vault.createBinary(fileName, fileContent);
+                return fileName.replace(/\s/g, '%20');
+            } catch (error) {
+                console.warn(error);
+            }
         }
     } catch (error) {
-        console.error();
-        return Promise.reject(error instanceof Error ? error : new Error(String(error)));
+        console.warn(error);
     }
-}
 
-function imageTagProcessor(plugin: ReadItNeverPlugin, noteFileName: string, assetsDir: string): Replacer {
-    return async function processImageTag(match: string, anchor: string, link: string): Promise<string> {
-        if (!isValidUrl(link, [HTTP_PROTOCOL, HTTPS_PROTOCOL])) {
-            return match;
-        }
-        const url = new URL(link);
-        await plugin.getVaultRepository().createDirectory(assetsDir);
-
-        try {
-            const { fileContent, fileExtension } = await downloadImage(url);
-
-            let attempt = 0;
-            while (attempt < CREATE_FILENAME_ATTEMPTS) {
-                try {
-                    const { fileName, needWrite } = await chooseFileName(
-                        plugin.app.vault.adapter,
-                        plugin.getFileSystemLimits(),
-                        assetsDir,
-                        noteFileName,
-                        fileExtension,
-                    );
-
-                    if (needWrite && fileName !== '') {
-                        await plugin.app.vault.createBinary(fileName, fileContent);
-                        const maskedFilename = fileName.replace(/\s/g, '%20');
-                        return `![${anchor}](${maskedFilename})`;
-                    } else {
-                        return match;
-                    }
-                } catch (error) {
-                    console.warn(error);
-                    attempt++;
-                }
-            }
-            return match;
-        } catch (error) {
-            console.warn(error);
-            return match;
-        }
-    };
+    return null;
 }
 
 async function chooseFileName(
@@ -92,15 +107,12 @@ async function chooseFileName(
     assetsDir: string,
     noteFileName: string,
     fileExtension: string,
-): Promise<{ fileName: string; needWrite: boolean }> {
+): Promise<string> {
     if (fileExtension === '') {
-        return { fileName: '', needWrite: false };
+        return '';
     }
 
-    let needWrite = false;
-    let fileName = '';
-    let index = 0;
-    while (fileName === '' && index < MAX_FILENAME_INDEX) {
+    for (let index = 0; index < MAX_FILENAME_INDEX; index++) {
         let suggestedName;
         if (dataAdapter instanceof CapacitorAdapter || dataAdapter instanceof FileSystemAdapter) {
             suggestedName = getOsOptimizedPath(
@@ -110,18 +122,15 @@ async function chooseFileName(
                 filesystemLimits,
             );
         } else {
-            suggestedName = `${assetsDir}/${noteFileName}-${createRandomString(10)}.${fileExtension}`;
+            suggestedName = normalizePath(`${assetsDir}/${noteFileName}-${createRandomString(10)}.${fileExtension}`);
         }
 
         if (!(await dataAdapter.exists(normalizePath(suggestedName), false))) {
-            fileName = suggestedName;
-            needWrite = true;
+            return suggestedName;
         }
-
-        index++;
     }
 
-    return { fileName, needWrite };
+    return '';
 }
 
 async function downloadImage(url: URL): Promise<{ fileContent: ArrayBuffer; fileExtension: string }> {
@@ -130,8 +139,15 @@ async function downloadImage(url: URL): Promise<{ fileContent: ArrayBuffer; file
         method: 'get',
     });
 
+    const mimeType = (res.headers['content-type'] || '').split(';')[0].trim();
+
     return {
         fileContent: res.arrayBuffer,
-        fileExtension: getFileExtensionFromMimeType(res.headers['content-type'] || '') ?? '',
+        fileExtension: getFileExtensionFromMimeType(mimeType) || getImageExtensionFromUrl(url),
     };
+}
+
+function getImageExtensionFromUrl(url: URL): string {
+    const match = url.pathname.match(/\.(png|jpe?g|gif|webp|svg|avif|bmp)$/i);
+    return match ? match[1].toLowerCase() : '';
 }

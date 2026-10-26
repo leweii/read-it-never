@@ -1,4 +1,5 @@
 import { DropdownEnumOption } from './enum';
+import { t } from 'src/i18n';
 
 export enum FileExistsStrategy {
     AppendToExisting = 'appendToExisting',
@@ -8,8 +9,8 @@ export enum FileExistsStrategy {
 
 export function getFileExistStrategyOptions(): DropdownEnumOption[] {
     return [
-        { label: 'Ask', option: FileExistsStrategy.Ask },
-        { label: 'Nothing', option: FileExistsStrategy.Nothing },
-        { label: 'Append to the existing note', option: FileExistsStrategy.AppendToExisting },
+        { label: t('settings.fileExistsStrategy.ask'), option: FileExistsStrategy.Ask },
+        { label: t('settings.fileExistsStrategy.nothing'), option: FileExistsStrategy.Nothing },
+        { label: t('settings.fileExistsStrategy.append'), option: FileExistsStrategy.AppendToExisting },
     ];
 }

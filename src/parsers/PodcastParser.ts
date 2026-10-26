@@ -68,21 +68,19 @@ class PodcastParser extends Parser {
         }
 
         const channel = feed.querySelector('channel') ?? feed.documentElement;
-        const item = feed.querySelector('item');
+        const item = feed.querySelector('item') ?? feed.querySelector('entry'); // RSS or Atom
         if (!item) {
             throw new Error(`No episodes found in feed ${url}.`);
         }
 
+        // Blog feeds (e.g. WordPress `/feed/`) have no enclosure; still save the latest item instead of failing.
         const audioUrl = item.querySelector('enclosure')?.getAttribute('url') ?? '';
-        if (!audioUrl) {
-            throw new Error(`Latest item in ${url} has no audio enclosure.`);
-        }
 
         const descriptionHtml =
             item.getElementsByTagName('content:encoded')[0]?.textContent ??
-            item.querySelector('description')?.textContent ??
+            item.querySelector('description, content, summary')?.textContent ??
             '';
-        const pubDate = item.querySelector('pubDate')?.textContent?.trim();
+        const pubDate = item.querySelector('pubDate, published, updated')?.textContent?.trim();
         const thumbnail =
             item.getElementsByTagName('itunes:image')[0]?.getAttribute('href') ??
             channel.getElementsByTagName('itunes:image')[0]?.getAttribute('href') ??
@@ -92,8 +90,11 @@ class PodcastParser extends Parser {
         return {
             date: this.getFormattedDateForContent(createdAt),
             episodeTitle: item.querySelector('title')?.textContent?.trim() || 'Untitled episode',
-            episodeURL: item.querySelector('link')?.textContent?.trim() || url,
-            episodePlayer: `<audio controls style="width: 100%;" src="${audioUrl}"></audio>`,
+            episodeURL:
+                item.querySelector('link')?.textContent?.trim() ||
+                item.querySelector('link')?.getAttribute('href') ||
+                url,
+            episodePlayer: audioUrl ? `<audio controls style="width: 100%;" src="${audioUrl}"></audio>` : '',
             episodeDescription: descriptionHtml ? await parseHtmlContent(descriptionHtml) : '',
             episodeThumbnail: thumbnail,
             episodeDurationFormatted: this.formatDuration(

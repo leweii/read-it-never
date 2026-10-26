@@ -8,152 +8,149 @@ const en: Record<string, string> = {
     'menu.title': 'Read It Never',
 
     // Notices
+    'notice.processing': 'Read It Never: Saving {content}…',
+    'notice.processingBatch': 'Read It Never: Saving {current} of {total}…',
+    'notice.batchSummary': 'Read It Never: {created} created, {existing} already existed, {failed} failed.',
     'notice.failedToProcess': 'Read It Never: Failed to process content. {message}',
+    'notice.failedToProcessItem': 'Read It Never: Failed to process {content}. {message}',
+    'notice.unableToSave': 'Unable to save {file}: {message}',
     'notice.unableToOpen': 'Unable to open {file}',
     'notice.noteUpdated': '{file} was updated.',
     'notice.noteNotUpdated': '{file} was not updated!',
     'notice.noteAlreadyExists': '{file} already exists.',
+    'notice.notesAlreadyExist': '{count} notes already exist and were skipped.',
     'notice.noteCreated': '{file} created successfully',
-    'notice.unableToEdit': 'Unable to edit {file}',
     'notice.notReaderable': '@mozilla/readability considers this document to unlikely be readerable.',
-    'notice.maxPathLengthNumber': 'Maximum file path length must be a number.',
-    'notice.maxFileNameLengthNumber': 'Maximum file name length must be a number.',
-    'notice.checkConsole': '{message} Check the console output.',
+    'notice.emptyContent': 'Read It Never: Nothing to save, the clipboard is empty.',
+    'notice.clipboardUnavailable': 'Read It Never: Unable to read the clipboard.',
+    'notice.alreadyProcessing': 'Read It Never: This content is already being saved.',
 
-    // Settings
+    // Duplicate note modal
+    'modal.fileExists.title': 'Duplicate notes detected',
+    'modal.fileExists.desc': 'Notes with these names already exist ({count}):',
+    'modal.fileExists.doNotAskAgain': 'Remember my choice',
+    'modal.fileExists.append': 'Append to existing',
+    'modal.fileExists.skip': 'Skip',
+
+    // Settings — tabs and sections
+    'settings.tab.general': 'General',
+    'settings.tab.contentTypes': 'Content types',
+    'settings.tab.integrations': 'Accounts & API',
+    'settings.tab.advanced': 'Advanced',
+    'settings.section.storage': 'Storage',
+    'settings.section.afterCreating': 'After saving',
+    'settings.section.dates': 'Date formats',
+    'settings.section.input': 'Input',
+    'settings.section.noteTemplate': 'Note',
+    'settings.section.images': 'Images',
+    'settings.section.player': 'Embedded player',
+    'settings.section.chapters': 'Chapters',
+    'settings.section.transcript': 'Transcript',
+    'settings.section.filesystemLimits': 'File system limits',
+    'settings.section.readableArticle': 'Article',
+    'settings.section.youtubeChannel': 'YouTube channel',
+    'settings.section.bilibili': 'Bilibili',
+    'settings.section.xiaoyuzhou': 'Xiaoyuzhou',
+    'settings.section.podcast': 'Podcast (RSS)',
+    'settings.section.nonReadableArticle': 'Unreadable page',
+    'settings.section.textSnippet': 'Text snippet',
+
+    // Settings — General
     'settings.inboxDir.name': 'Inbox directory',
     'settings.inboxDir.desc':
-        'Enter valid directory name. For nested directory use this format: Directory A/Directory B. If no directory is entered, new note will be created in vault root.',
-    'settings.inboxDir.placeholder': 'Defaults to vault root directory',
+        'Where new notes are created, e.g. "Reading/Inbox". Supports {{ date }}, {{ contentType }} and {{ fileName }}. Leave empty for the vault root.',
+    'settings.inboxDir.placeholder': 'Vault root',
     'settings.assetsDir.name': 'Assets directory',
     'settings.assetsDir.desc':
-        'Enter valid directory name. For nested directory use this format: Directory A/Directory B. If no directory is entered, new note will be created in Vault root.',
-    'settings.assetsDir.placeholder': 'Defaults to vault root directory',
-    'settings.openNewNote.name': 'Open new note in current workspace',
-    'settings.openNewNote.desc': 'If enabled, new note will open in current workspace',
-    'settings.openNewNoteInNewTab.name': 'Open new note in new tab',
-    'settings.openNewNoteInNewTab.desc': 'If enabled, new note will open in new tab',
-    'settings.fileExistsStrategy.name': 'Duplicate note filename behavior',
-    'settings.fileExistsStrategy.desc': 'Applied when note with the same filename already exists',
-    'settings.batchProcessDelimiter.name': 'Batch note creation delimiter',
-    'settings.batchProcessDelimiter.desc': 'Delimiter for batch list of notes',
-    'settings.dateTitleFmt.name': 'Date format string',
-    'settings.dateTitleFmt.desc': 'Format of the %date% variable. NOTE: do not use symbols forbidden in file names.',
-    'settings.dateTitleFmt.placeholder': 'Defaults to {fmt}',
-    'settings.dateContentFmt.name': 'Date format string in content',
-    'settings.dateContentFmt.desc': 'Format of the %date% variable for content',
-    'settings.dateContentFmt.placeholder': 'Defaults to {fmt}',
-    'settings.extendShareMenu.name': 'Extend share menu',
+        'Where downloaded images are stored. Supports {{ date }}, {{ contentType }} and {{ fileName }}. Leave empty for the vault root.',
+    'settings.assetsDir.placeholder': 'Vault root',
+    'settings.openNote.name': 'Open the new note',
+    'settings.openNote.desc': 'What to do with a note after it has been saved.',
+    'settings.openNote.doNotOpen': "Don't open",
+    'settings.openNote.currentTab': 'Open in current tab',
+    'settings.openNote.newTab': 'Open in new tab',
+    'settings.fileExistsStrategy.name': 'When a note with the same name exists',
+    'settings.fileExistsStrategy.desc': 'Applied when a note with the same file name already exists.',
+    'settings.fileExistsStrategy.ask': 'Ask every time',
+    'settings.fileExistsStrategy.nothing': 'Skip',
+    'settings.fileExistsStrategy.append': 'Append to the existing note',
+    'settings.dateTitleFmt.name': 'Date format in file names',
+    'settings.dateTitleFmt.desc':
+        'Moment.js format of {{ date }} in title templates. Avoid characters not allowed in file names.',
+    'settings.dateContentFmt.name': 'Date format in notes',
+    'settings.dateContentFmt.desc': 'Moment.js format of dates inside note content.',
+    'settings.dateFormat.preview': 'Preview: {preview}',
+    'settings.batchProcessDelimiter.name': 'Batch delimiter',
+    'settings.batchProcessDelimiter.desc': 'Separates links when using "Create from batch in clipboard".',
+    'settings.delimiter.newLine': 'New line',
+    'settings.delimiter.comma': 'Comma',
+    'settings.delimiter.period': 'Period',
+    'settings.delimiter.semicolon': 'Semicolon',
+    'settings.extendShareMenu.name': 'Add to share menu',
     'settings.extendShareMenu.desc':
-        'If enabled, share menu will be extended with shortcut to create note directly from it. Requires plugin reload or Obsidian restart to apply change.',
-    'settings.youtubeApiKey.name': 'Youtube Data API v3 key',
-    'settings.youtubeApiKey.desc': 'If entered, Youtube related content types will use Youtube API to fetc the data.',
-    'settings.contentTypes.heading': 'Content Types',
-    'settings.contentTypes.desc': 'Settings for each content. Click on caret to expand.',
+        'Adds "Read It Never" to the share menu on mobile. Requires reloading the plugin or restarting Obsidian.',
 
-    // Settings sections
-    'settings.section.readableArticle': 'Readable Article',
-    'settings.section.youtubeChannel': 'YouTube channel',
-    'settings.section.nonReadableArticle': 'Nonreadable Article',
-    'settings.section.textSnippet': 'Text Snippet',
-
-    // Settings — Readable Article
-    'settings.readableArticle.slug.name': 'Readable content type slug',
-    'settings.readableArticle.title.name': 'Readable article note template title',
-    'settings.readableArticle.template.name': 'Readable article note template',
+    // Settings — Content types
+    'settings.contentTypes.desc': 'Choose a content type to customise how its notes are named and what they contain.',
+    'settings.contentType.title.name': 'File name template',
+    'settings.contentType.template.name': 'Note template',
+    'settings.contentType.slug.name': 'Content type slug',
+    'settings.contentType.slug.desc': 'Available as {{ contentType }} in the inbox and assets directory paths.',
+    'settings.template.variables': 'Variables:',
+    'settings.template.insertVariable': 'Insert {variable}',
+    'settings.templateVariableReference.see': 'Templates support variables, filters and loops. See the ',
+    'settings.templateVariableReference.link': 'template reference',
+    'settings.resetToDefault': 'Reset to default',
     'settings.readableArticle.downloadImages.name': 'Download images',
     'settings.readableArticle.downloadImages.desc':
-        'Images from article will be downloaded to the assets directory (Desktop App feature only). To dynamically change destination directory you can use variables. Check variables reference to learn more.',
-    'settings.readableArticle.downloadImagesInArticleDir.name': 'Download images to note directory',
+        'Save article images into the assets directory so notes work offline (desktop only).',
+    'settings.readableArticle.downloadImagesInArticleDir.name': 'Separate folder per note',
     'settings.readableArticle.downloadImagesInArticleDir.desc':
-        'Images from article will be downloaded to the dedicated note assets directory (Desktop App feature only). Overrides assets directory template.',
-
-    // Settings — YouTube
-    'settings.youtube.slug.name': 'Youtube content type slug',
-    'settings.youtube.title.name': 'Youtube note template title',
-    'settings.youtube.template.name': 'Youtube note template',
-    'settings.youtube.chapter.name': 'Youtube chapter template',
-    'settings.youtube.embedWidth.name': 'Youtube embed player width',
-    'settings.youtube.embedHeight.name': 'Youtube embed player height',
-    'settings.youtube.privacyEnhanced.name': 'Embed in privacy enhanced mode',
+        "Store each article's images in a subfolder named after the note inside the assets directory.",
+    'settings.embedSize.name': 'Player size',
+    'settings.embedSize.desc': 'Width and height of the embedded player in pixels.',
+    'settings.youtube.privacyEnhanced.name': 'Privacy-enhanced mode',
     'settings.youtube.privacyEnhanced.desc':
-        'If enabled, content will be embeded in privacy enhanced mode, which prevents the use of views of it from influencing the viewer’s browsing experience on YouTube.',
-    'settings.youtube.fetchTranscript.name': 'Fetch video transcript',
-    'settings.youtube.fetchTranscript.desc':
-        'If enabled, the video closed captions are fetched and made available as the {{ videoTranscript }} template variable.',
+        'Embed via youtube-nocookie.com so watching in Obsidian does not affect your YouTube recommendations.',
+    'settings.youtube.chapter.name': 'Chapter line template',
+    'settings.youtube.fetchTranscript.name': 'Fetch transcript',
+    'settings.youtube.fetchTranscript.desc': 'Make the closed captions available as {{ videoTranscript }}.',
     'settings.youtube.transcriptLanguage.name': 'Transcript language',
     'settings.youtube.transcriptLanguage.desc':
-        'Preferred transcript language code (e.g. "en", "zh"). Leave empty to use the default/first available track.',
-    'settings.youtube.transcriptLine.name': 'Youtube transcript line template',
-    'settings.youtube.transcriptLine.desc':
-        'Template for each transcript line. Available variables: transcriptTimestamp, transcriptText, transcriptSeconds, transcriptUrl.',
-    'settings.youtube.transcriptLinesPerBlock.name': 'Youtube transcript caption lines per block',
-    'settings.youtube.transcriptLinesPerBlock.desc':
-        'Number of caption lines grouped into one timestamped transcript block.',
-
-    // Settings — YouTube channel
-    'settings.youtubeChannel.slug.name': 'Youtube channel content type slug',
-    'settings.youtubeChannel.title.name': 'Youtube channel note template title',
-    'settings.youtubeChannel.template.name': 'Youtube channel note template',
-
-    // Settings — X.com
-    'settings.x.slug.name': 'X.com content type slug',
-    'settings.x.title.name': 'X.com note template title',
-    'settings.x.template.name': 'X.com note template',
-
-    // Settings — Bilibili
-    'settings.bilibili.slug.name': 'Bilibili content type slug',
-    'settings.bilibili.title.name': 'Bilibili note template title',
-    'settings.bilibili.template.name': 'Bilibili note template',
-    'settings.bilibili.embedWidth.name': 'Bilibili embed player width',
-    'settings.bilibili.embedHeight.name': 'Bilibili embed player height',
-    'settings.bilibili.fetchTranscript.name': 'Fetch video transcript',
+        'Preferred language code, e.g. "en" or "zh". Leave empty for the default track.',
+    'settings.youtube.transcriptLine.name': 'Transcript line template',
+    'settings.youtube.transcriptLinesPerBlock.name': 'Caption lines per block',
+    'settings.youtube.transcriptLinesPerBlock.desc': 'Number of caption lines grouped under one timestamp.',
+    'settings.bilibili.fetchTranscript.name': 'Fetch subtitles',
     'settings.bilibili.fetchTranscript.desc':
-        'If enabled, the video subtitles are fetched and made available as the {{ videoTranscript }} template variable. Bilibili only returns subtitles to logged-in requests, so a SESSDATA cookie is required (see below).',
+        'Make the subtitles available as {{ videoTranscript }}. Requires a SESSDATA cookie.',
+    'settings.bilibili.transcriptLanguage.name': 'Subtitle language',
+    'settings.bilibili.transcriptLanguage.desc':
+        'Preferred language code, e.g. "zh-CN" or "en". Leave empty to prefer human subtitles over AI-generated ones.',
+    'settings.bilibili.transcriptLine.name': 'Subtitle line template',
+    'settings.bilibili.transcriptLinesPerBlock.name': 'Subtitle lines per block',
+    'settings.bilibili.transcriptLinesPerBlock.desc': 'Number of subtitle lines grouped under one timestamp.',
+    'settings.bilibili.sessdataMissing': 'Bilibili only returns subtitles to logged-in users. Add your SESSDATA in ',
+
+    // Settings — Accounts & API
+    'settings.youtubeApiKey.name': 'YouTube Data API v3 key',
+    'settings.youtubeApiKey.desc':
+        'Optional. With a key, YouTube metadata (duration, tags, exact dates) is fetched from the official API.',
+    'settings.youtubeApiKey.howTo': 'How to get an API key',
     'settings.bilibili.sessdata.name': 'SESSDATA cookie',
     'settings.bilibili.sessdata.desc':
-        'Your Bilibili SESSDATA cookie value. Log in at bilibili.com in a browser, open developer tools → Application → Cookies, and copy the SESSDATA value. Without it the subtitle list comes back empty.',
-    'settings.bilibili.transcriptLanguage.name': 'Transcript language',
-    'settings.bilibili.transcriptLanguage.desc':
-        'Preferred subtitle language code (e.g. "zh-CN", "en"). Leave empty to prefer a human track over an AI-generated one, falling back to the first available.',
-    'settings.bilibili.transcriptLine.name': 'Bilibili transcript line template',
-    'settings.bilibili.transcriptLine.desc':
-        'Template for each transcript line. Available variables: transcriptTimestamp, transcriptText, transcriptSeconds, transcriptUrl.',
-    'settings.bilibili.transcriptLinesPerBlock.name': 'Bilibili transcript caption lines per block',
-    'settings.bilibili.transcriptLinesPerBlock.desc':
-        'Number of caption lines grouped into one timestamped transcript block.',
-
-    // Settings — Xiaoyuzhou
-    'settings.xiaoyuzhou.slug.name': 'Xiaoyuzhou content type slug',
-    'settings.xiaoyuzhou.title.name': 'Xiaoyuzhou note template title',
-    'settings.xiaoyuzhou.template.name': 'Xiaoyuzhou note template',
-
-    // Settings — Podcast (generic RSS feed)
-    'settings.section.podcast': 'Podcast (RSS feed)',
-    'settings.podcast.slug.name': 'Podcast content type slug',
-    'settings.podcast.title.name': 'Podcast note template title',
-    'settings.podcast.template.name': 'Podcast note template',
-
-    // Settings — Nonreadable Article
-    'settings.nonReadableArticle.slug.name': 'Nonreadable content type slug',
-    'settings.nonReadableArticle.title.name': 'Nonreadable article note template title',
-    'settings.nonReadableArticle.template.name': 'Nonreadable article note template',
-
-    // Settings — Text Snippet
-    'settings.textSnippet.slug.name': 'Text Snippet content type slug',
-    'settings.textSnippet.title.name': 'Text snippet note template title',
-    'settings.textSnippet.template.name': 'Text snippet note template',
+        'Log in at bilibili.com, open developer tools → Application → Cookies and copy the SESSDATA value.',
+    'settings.secret.toggleVisibility': 'Show / hide',
+    'settings.integrations.storageNote':
+        "Keys are stored in plain text in this plugin's data.json inside your vault. Be careful when syncing or sharing your vault.",
 
     // Settings — Advanced
-    'settings.advanced.heading': 'Advanced',
+    'settings.filesystemLimits.desc':
+        'Long titles are shortened to fit these limits (measured in bytes). Leave empty to use the platform default.',
     'settings.filesystemLimitPath.name': 'Maximum file path length',
-    'settings.filesystemLimitPath.desc': 'Defaults to {limit} characters on your current platform.',
+    'settings.filesystemLimitPath.desc': 'Platform default: {limit}.',
     'settings.filesystemLimitFileName.name': 'Maximum file name length',
-    'settings.filesystemLimitFileName.desc': 'Defaults to {limit} characters on your current platform.',
-
-    // Settings — template variable reference
-    'settings.templateVariableReference.see': 'See the ',
-    'settings.templateVariableReference.link': 'template variables reference',
+    'settings.filesystemLimitFileName.desc': 'Platform default: {limit}.',
 };
 
 export default en;

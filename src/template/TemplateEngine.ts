@@ -11,7 +11,15 @@ interface Modifiers {
 }
 
 export const stringableTypes: string[] = ['string', 'number', 'bigint', 'symbol'];
-export const variableRegex = /{{(.*?)}}/g;
+
+const tokenRegex = new RegExp(
+    [
+        /{%\s*for\s+(\w+)\s+in\s+(\w+(?:\.\w+)*)\s*%}([\s\S]*?){%\s*endfor\s*%}/.source,
+        /{{(.*?)}}/.source,
+        /%(\w+(?:\.\w+)*)%/.source,
+    ].join('|'),
+    'g',
+);
 
 export default class TemplateEngine {
     private modifiers: Modifiers;
@@ -52,18 +60,17 @@ export default class TemplateEngine {
                     return value;
                 }
                 const stringable = value as string | number | bigint | symbol;
-                String(stringable).toLowerCase();
+                return String(stringable).toLowerCase();
             },
-            map: (value: unknown, transform: unknown) => {
+            map: (value: unknown, key: unknown) => {
                 if (!this.validateFilterValueType(value, 'map', ['array'])) {
                     return value;
                 }
-                try {
-                    return (value as unknown[]).map(transform as (item: unknown) => unknown);
-                } catch (e) {
-                    console.warn('Error in map modifier:', e);
+                if (typeof key !== 'string' || key === '') {
+                    console.warn('Filter map expects a property name, e.g. map("name").');
                     return value;
                 }
+                return (value as unknown[]).map((item) => this.resolveValue(key, item as TemplateData));
             },
             replace: (value: unknown, search: unknown, replacement: unknown = '') => {
                 if (!this.validateFilterValueType(value, 'replace', stringableTypes)) {
@@ -91,109 +98,144 @@ export default class TemplateEngine {
                     return value;
                 }
                 const stringable = value as string | number | bigint | symbol;
-                String(stringable).toUpperCase();
+                return String(stringable).toUpperCase();
             },
         };
     }
 
     public render(template: string, data: TemplateData): string {
         try {
-            // First process any loops in the template
-            let result = this.processLoops(template, data);
-
-            // Then process variables with modifiers
-            result = this.processVariables(result, data);
-
-            // Finally process simple pattern substitutions
-            result = this.processSimplePattern(result, data);
-
-            return result;
+            // Loops, variables and simple patterns are substituted in a single left-to-right pass so
+            // that substituted values (e.g. fetched article text containing "{{" or "%") are never
+            // re-interpreted as template syntax.
+            return template.replace(
+                tokenRegex,
+                (
+                    match: string,
+                    loopItemName: string | undefined,
+                    loopArrayPath: string | undefined,
+                    loopContent: string | undefined,
+                    variable: string | undefined,
+                    simplePath: string | undefined,
+                ) => {
+                    if (loopItemName !== undefined) {
+                        return this.processLoop(match, loopItemName, loopArrayPath, loopContent, data);
+                    }
+                    if (variable !== undefined) {
+                        return this.processVariable(match, variable, data);
+                    }
+                    return this.processSimplePattern(match, simplePath, data);
+                },
+            );
         } catch (e) {
             console.error('Error rendering template:', e);
             return template; // Return original template on error
         }
     }
 
-    private processSimplePattern(template: string, data: TemplateData): string {
-        const simplePatternRegex = /%(\w+(?:\.\w+)*)%/g;
+    private processSimplePattern(match: string, path: string, data: TemplateData): string {
+        try {
+            const value = this.resolveValue(path, data);
 
-        return template.replace(simplePatternRegex, (match: string, path: string) => {
-            try {
-                const value = this.resolveValue(path, data);
-
-                if (value === undefined) {
-                    console.warn(`Unable to resolve ${path}`);
-                    return match;
-                }
-
-                const stringable = value as string | number | bigint | symbol;
-                return String(stringable);
-            } catch (e) {
-                console.warn(`Error processing simple pattern "${match}":`, e);
+            if (value === undefined) {
                 return match;
             }
-        });
+
+            const stringable = value as string | number | bigint | symbol;
+            return String(stringable);
+        } catch (e) {
+            console.warn(`Error processing simple pattern "${match}":`, e);
+            return match;
+        }
     }
 
-    private processVariables(template: string, data: TemplateData): string {
-        return template.replace(variableRegex, (match: string, content: string) => {
-            try {
-                const [key, ...modifiers] = content.split('|').map((item) => item.trim());
+    private processVariable(match: string, content: string, data: TemplateData): string {
+        try {
+            const [key, ...modifiers] = this.splitModifiers(content).map((item) => item.trim());
 
-                // check if value is raw string
-                const rawStringRegex = /(['"])((?:[^\\]|\\.)*?)\1/;
-                const rawStringMatch = rawStringRegex.exec(key);
+            // check if value is raw string
+            const rawStringRegex = /^(['"])((?:[^\\]|\\.)*?)\1$/;
+            const rawStringMatch = rawStringRegex.exec(key);
 
-                let value: unknown;
+            let value: unknown;
 
-                // if value is raw string don't resolve value from template data
-                if (rawStringMatch !== null) {
-                    value = rawStringMatch[2];
-                } else {
-                    value = this.resolveValue(key, data);
-                }
+            // if value is raw string or number literal don't resolve value from template data
+            if (rawStringMatch !== null) {
+                value = rawStringMatch[2];
+            } else if (/^-?\d+(?:\.\d+)?$/.test(key)) {
+                value = Number(key);
+            } else {
+                value = this.resolveValue(key, data);
+            }
 
-                if (value === undefined) {
-                    console.warn(`Unable to resolve ${key}`);
-                    return match;
-                }
-
-                let processedValue: unknown = value;
-                for (const modifier of modifiers) {
-                    processedValue = this.applyModifier(processedValue, modifier);
-                }
-                const stringable = processedValue as string | number | bigint | symbol;
-                return String(stringable);
-            } catch (e) {
-                console.warn(`Error processing variable "${match}":`, e);
+            if (value === undefined) {
+                console.warn(`Unable to resolve ${key}`);
                 return match;
             }
-        });
-    }
 
-    private processLoops(template: string, data: TemplateData): string {
-        const loopRegex = /{%\s*for\s+(\w+)\s+in\s+(\w+(?:\.\w+)*)\s*%}([\s\S]*?){%\s*endfor\s*%}/g;
-
-        return template.replace(loopRegex, (match: string, itemName: string, arrayPath: string, content: string) => {
-            try {
-                const arrayValue = this.resolveValue(arrayPath, data);
-
-                if (!Array.isArray(arrayValue)) {
-                    console.warn(`Value at "${arrayPath}" is not an array`);
-                    return '';
-                }
-
-                return arrayValue
-                    .map((item: unknown) => {
-                        const loopContext: TemplateData = { ...data, [itemName]: item };
-                        return this.render(content, loopContext);
-                    })
-                    .join('');
-            } catch (e) {
-                console.warn(`Error processing loop "${match}":`, e);
+            let processedValue: unknown = value;
+            for (const modifier of modifiers) {
+                processedValue = this.applyModifier(processedValue, modifier);
+            }
+            if (processedValue === undefined || processedValue === null) {
                 return '';
             }
-        });
+            const stringable = processedValue as string | number | bigint | symbol;
+            return String(stringable);
+        } catch (e) {
+            console.warn(`Error processing variable "${match}":`, e);
+            return match;
+        }
+    }
+
+    /**
+     * Splits `value | filter("a|b") | other` on pipes that are not inside quotes.
+     */
+    private splitModifiers(content: string): string[] {
+        const parts: string[] = [];
+        let current = '';
+        let quoteChar = '';
+
+        for (const char of content) {
+            if (quoteChar !== '') {
+                if (char === quoteChar) {
+                    quoteChar = '';
+                }
+                current += char;
+            } else if (char === '"' || char === "'") {
+                quoteChar = char;
+                current += char;
+            } else if (char === '|') {
+                parts.push(current);
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+        parts.push(current);
+
+        return parts;
+    }
+
+    private processLoop(match: string, itemName: string, arrayPath: string, content: string, data: TemplateData) {
+        try {
+            const arrayValue = this.resolveValue(arrayPath, data);
+
+            if (!Array.isArray(arrayValue)) {
+                console.warn(`Value at "${arrayPath}" is not an array`);
+                return '';
+            }
+
+            return arrayValue
+                .map((item: unknown) => {
+                    const loopContext: TemplateData = { ...data, [itemName]: item };
+                    return this.render(content, loopContext);
+                })
+                .join('');
+        } catch (e) {
+            console.warn(`Error processing loop "${match}":`, e);
+            return '';
+        }
     }
 
     private resolveValue(path: string, data: TemplateData): unknown {
@@ -216,7 +258,7 @@ export default class TemplateEngine {
     }
 
     private parseModifier(modifierString: string): { name: string; args: unknown[] } {
-        const match = modifierString.match(/(\w+)(?:\((.*?)\))?/);
+        const match = modifierString.match(/^(\w+)(?:\(([\s\S]*)\))?$/);
         if (!match) return { name: modifierString, args: [] };
 
         const [, name, argsString] = match;

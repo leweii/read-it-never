@@ -35,7 +35,7 @@ function parseTwitterOEmbedResponse(raw: string): TwitterOEmbedResponse {
 }
 
 class TwitterParser extends Parser {
-    private PATTERN = /(https:\/\/(twitter|x).com\/([a-zA-Z0-9_]+\/)([a-zA-Z0-9_]+\/[a-zA-Z0-9_]+))/;
+    private PATTERN = /^https?:\/\/(?:www\.|mobile\.)?(?:twitter|x)\.com\/[a-zA-Z0-9_]+\/status(?:es)?\/\d+/i;
 
     test(url: string): boolean {
         return this.isValidUrl(url) && this.PATTERN.test(url);
@@ -45,9 +45,10 @@ class TwitterParser extends Parser {
         const createdAt = new Date();
         const twitterUrl = new URL(url);
 
-        if (twitterUrl.hostname === 'x.com') {
-            twitterUrl.hostname = 'twitter.com';
-        }
+        // The oEmbed endpoint only understands canonical twitter.com URLs without tracking params.
+        twitterUrl.hostname = 'twitter.com';
+        twitterUrl.search = '';
+        twitterUrl.hash = '';
 
         const data = await this.getTweetNoteData(twitterUrl, createdAt);
 
@@ -66,7 +67,7 @@ class TwitterParser extends Parser {
             await request({
                 method: 'GET',
                 contentType: 'application/json',
-                url: `https://publish.twitter.com/oembed?url=${url.href}`,
+                url: `https://publish.twitter.com/oembed?url=${encodeURIComponent(url.href)}`,
             }),
         );
 

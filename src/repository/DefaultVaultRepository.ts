@@ -1,4 +1,4 @@
-import { CapacitorAdapter, FileSystemAdapter, Notice, TFile, TFolder, normalizePath } from 'obsidian';
+import { CapacitorAdapter, FileSystemAdapter, TFile, TFolder, normalizePath } from 'obsidian';
 import FileExistsError from '../error/FileExists';
 import { VaultRepository } from './VaultRepository';
 import { Note } from 'src/parsers/Note';
@@ -6,9 +6,7 @@ import ReadItNeverPlugin from 'src/main';
 import { getOsOptimizedPath } from 'src/helpers/fileutils';
 import TemplateEngine from 'src/template/TemplateEngine';
 import { formatDate } from 'src/helpers/date';
-import { t } from 'src/i18n';
 import FileNotFoundError from 'src/error/FileNotFound';
-import { revealActiveFileInExplorer } from 'src/helpers/workspaceUtils';
 
 export default class DefaultVaultRepository implements VaultRepository {
     private plugin: ReadItNeverPlugin;
@@ -19,68 +17,41 @@ export default class DefaultVaultRepository implements VaultRepository {
         this.templateEngine = templateEngine;
     }
 
-    public async saveNote(note: Note): Promise<void> {
-        let filePath;
-
-        if (
-            this.plugin.app.vault.adapter instanceof CapacitorAdapter ||
-            this.plugin.app.vault.adapter instanceof FileSystemAdapter
-        ) {
-            filePath = getOsOptimizedPath(
-                '/',
-                note.getFullFilename(),
-                this.plugin.app.vault.adapter,
-                this.plugin.getFileSystemLimits(),
-            );
-        } else {
-            filePath = normalizePath(`/${note.getFullFilename()}`);
-        }
+    public async saveNote(note: Note): Promise<TFile> {
+        let directory = '/';
 
         if (this.plugin.settings.inboxDir) {
-            const inboxDir = this.templateEngine.render(this.plugin.settings.inboxDir, {
+            directory = this.templateEngine.render(this.plugin.settings.inboxDir, {
                 date: formatDate(note.createdAt, this.plugin.settings.dateTitleFmt),
                 fileName: note.fileName,
                 contentType: note.contentType,
             });
-            await this.createDirectory(inboxDir);
-            if (
-                this.plugin.app.vault.adapter instanceof CapacitorAdapter ||
-                this.plugin.app.vault.adapter instanceof FileSystemAdapter
-            ) {
-                filePath = getOsOptimizedPath(
-                    inboxDir,
-                    note.getFullFilename(),
-                    this.plugin.app.vault.adapter,
-                    this.plugin.getFileSystemLimits(),
-                );
-            } else {
-                filePath = normalizePath(`${inboxDir}/${note.getFullFilename()}`);
-            }
+            await this.createDirectory(directory);
         }
 
-        note.filePath = filePath;
+        note.filePath = this.getFilePath(directory, note.getFullFilename());
 
         if (await this.exists(note.filePath)) {
             throw new FileExistsError(`${note.getFullFilename()} already exists!`);
-        } else {
-            const newFile = await this.plugin.app.vault.create(note.filePath, note.content);
-            if (this.plugin.settings.openNewNote || this.plugin.settings.openNewNoteInNewTab) {
-                await this.plugin.app.workspace
-                    .getLeaf(this.plugin.settings.openNewNoteInNewTab ? 'tab' : false)
-                    .openFile(newFile);
-                revealActiveFileInExplorer(this.plugin.app);
-            }
-            new Notice(t('notice.noteCreated', { file: note.getFullFilename() }));
         }
+
+        return await this.plugin.app.vault.create(note.filePath, await note.getFinalContent());
     }
 
     public async createDirectory(directoryPath: string): Promise<void> {
         const normalizedPath = normalizePath(directoryPath);
-        const directory = this.plugin.app.vault.getAbstractFileByPath(normalizedPath);
-        if (directory && directory instanceof TFolder) {
+        if (normalizedPath === '/' || this.plugin.app.vault.getAbstractFileByPath(normalizedPath) instanceof TFolder) {
             return;
         }
-        await this.plugin.app.vault.createFolder(normalizedPath);
+
+        try {
+            await this.plugin.app.vault.createFolder(normalizedPath);
+        } catch (error) {
+            // Another note/image created the same folder concurrently.
+            if (!(this.plugin.app.vault.getAbstractFileByPath(normalizedPath) instanceof TFolder)) {
+                throw error;
+            }
+        }
     }
 
     public async exists(filePath: string): Promise<boolean> {
@@ -97,20 +68,24 @@ export default class DefaultVaultRepository implements VaultRepository {
         return file;
     }
 
-    public async appendToExistingNote(note: Note): Promise<void> {
-        let file;
-        try {
-            file = this.getFileByPath(note.filePath);
-        } catch (error) {
-            if (error instanceof FileNotFoundError) {
-                new Notice(t('notice.unableToEdit', { file: note.getFullFilename() }));
-            } else {
-                throw error;
-            }
-        }
+    public async appendToExistingNote(note: Note): Promise<TFile> {
+        const file = this.getFileByPath(note.filePath);
+        const content = await note.getFinalContent();
 
         await this.plugin.app.vault.process(file, (data) => {
-            return `${data}\n\n${note.content}`;
+            return `${data}\n\n${content}`;
         });
+
+        return file;
+    }
+
+    private getFilePath(directory: string, fileName: string): string {
+        const adapter = this.plugin.app.vault.adapter;
+
+        if (adapter instanceof CapacitorAdapter || adapter instanceof FileSystemAdapter) {
+            return getOsOptimizedPath(directory, fileName, adapter, this.plugin.getFileSystemLimits());
+        }
+
+        return normalizePath(`${directory}/${fileName}`);
     }
 }

@@ -2,6 +2,7 @@ import { request, requestUrl } from 'obsidian';
 import { Note } from './Note';
 import { Parser } from './Parser';
 import { handleError } from 'src/helpers/error';
+import { desktopBrowserUserAgent } from 'src/helpers/networkUtils';
 
 interface BilibiliViewResponse {
     code: number;
@@ -91,11 +92,36 @@ type BilibiliNoteData = {
     videoTranscript: string;
 };
 
+const BILIBILI_HEADERS = {
+    ...desktopBrowserUserAgent,
+    referer: 'https://www.bilibili.com',
+};
+
 class BilibiliParser extends Parser {
-    private PATTERN = /(bilibili.com)\/(video)?\/([a-z0-9]+)?/i;
+    private PATTERN = /bilibili\.com\/(?:s\/)?video\/((?:BV[0-9A-Za-z]{10})|(?:av\d+))/i;
+    // Short links shared from the Bilibili mobile app, e.g. https://b23.tv/AbCdEf
+    private SHORT_LINK_PATTERN = /^https?:\/\/(?:www\.)?(?:b23\.tv|bili2233\.cn)\/[0-9A-Za-z]+/i;
 
     test(url: string): boolean {
-        return this.isValidUrl(url) && this.PATTERN.test(url);
+        return this.isValidUrl(url) && (this.PATTERN.test(url) || this.SHORT_LINK_PATTERN.test(url));
+    }
+
+    /**
+     * Resolves a b23.tv short link to its video id by following the redirect and looking for the
+     * id in the landing page.
+     */
+    private async resolveVideoId(url: string): Promise<string> {
+        const directMatch = this.PATTERN.exec(url)?.[1];
+        if (directMatch) {
+            return directMatch;
+        }
+
+        const response = await requestUrl({ method: 'GET', url, headers: { ...BILIBILI_HEADERS } });
+        const videoId = response.text.match(/BV[0-9A-Za-z]{10}/)?.[0];
+        if (!videoId) {
+            throw new Error(`${url} does not point to a Bilibili video.`);
+        }
+        return videoId;
     }
 
     async prepareNote(url: string): Promise<Note> {
@@ -118,17 +144,13 @@ class BilibiliParser extends Parser {
     }
 
     private async getNoteData(url: string, createdAt: Date): Promise<BilibiliNoteData> {
-        const videoId = this.PATTERN.exec(url)?.[3] ?? '';
+        const videoId = await this.resolveVideoId(url);
         const idQuery = /^av\d+$/i.test(videoId) ? `aid=${videoId.slice(2)}` : `bvid=${videoId}`;
 
         const response = await requestUrl({
             method: 'GET',
             url: `https://api.bilibili.com/x/web-interface/view?${idQuery}`,
-            headers: {
-                'user-agent':
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
-                referer: 'https://www.bilibili.com',
-            },
+            headers: { ...BILIBILI_HEADERS },
         });
 
         if (response.status === 429) {
@@ -152,7 +174,7 @@ class BilibiliParser extends Parser {
             date: this.getFormattedDateForContent(createdAt),
             videoId: video.bvid,
             videoTitle: video.title,
-            videoURL: url,
+            videoURL: this.SHORT_LINK_PATTERN.test(url) ? `https://www.bilibili.com/video/${video.bvid}` : url,
             videoPlayer: `<iframe width="${this.plugin.settings.bilibiliEmbedWidth}" height="${this.plugin.settings.bilibiliEmbedHeight}" src="https://player.bilibili.com/player.html?autoplay=0&bvid=${video.bvid}" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>`,
             videoDescription: video.desc,
             videoThumbnail: video.pic.replace(/^http:/, 'https:'),
@@ -183,11 +205,7 @@ class BilibiliParser extends Parser {
 
         try {
             const sessdata = this.plugin.settings.bilibiliSessdata?.trim();
-            const headers: Record<string, string> = {
-                'user-agent':
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
-                referer: 'https://www.bilibili.com',
-            };
+            const headers: Record<string, string> = { ...BILIBILI_HEADERS };
             if (sessdata) {
                 headers.cookie = `SESSDATA=${sessdata}`;
             }

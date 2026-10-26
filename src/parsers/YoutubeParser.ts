@@ -172,14 +172,25 @@ interface YoutubeStructuredDescriptionItem {
 
 class YoutubeParser extends Parser {
     private PATTERN =
-        /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]+)(?:\?([^&\s]+(?:&[^&\s]+)*))?/;
+        /^(?:https?:\/\/)?(?:(?:www|m|music)\.)?(?:youtube\.com\/(?:watch\?(?:[^#\s]*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
 
     test(url: string): boolean {
         return this.isValidUrl(url) && this.PATTERN.test(url);
     }
 
+    /**
+     * Canonical watch URL; also used for fetching so that mobile/music/live/shorts links all resolve
+     * to the regular desktop watch page the schema parser expects.
+     */
+    private getCanonicalUrl(url: string): string {
+        const videoId = this.PATTERN.exec(url)[1];
+        const timestamp = new URL(url).searchParams.get('t');
+        return `https://www.youtube.com/watch?v=${videoId}${timestamp ? `&t=${timestamp}` : ''}`;
+    }
+
     async prepareNote(url: string): Promise<Note> {
         const createdAt = new Date();
+        url = this.getCanonicalUrl(url);
         const data =
             this.plugin.settings.youtubeApiKey === ''
                 ? await this.parseSchema(url, createdAt)
@@ -304,9 +315,10 @@ class YoutubeParser extends Parser {
                 '';
             const chapters = this.getVideoChapters(description);
             const publishedAt =
-                jsonData?.engagementPanels?.[5]?.engagementPanelSectionListRenderer?.content
-                    ?.structuredDescriptionContentRenderer?.items?.[0]?.videoDescriptionHeaderRenderer?.publishDate
-                    ?.simpleText ?? '';
+                videoSchemaElement.querySelector('[itemprop="datePublished"]')?.getAttribute('content') ??
+                videoSchemaElement.querySelector('[itemprop="uploadDate"]')?.getAttribute('content') ??
+                this.findPublishDate(jsonData) ??
+                '';
             const videoViewsCount =
                 jsonData?.contents?.twoColumnWatchNextResults?.results?.results?.contents?.[0]?.videoPrimaryInfoRenderer
                     ?.viewCount?.videoViewCountRenderer?.originalViewCount ?? 0;
@@ -317,6 +329,9 @@ class YoutubeParser extends Parser {
                 '';
 
             const videoTranscript = await this.getVideoTranscript(videoId);
+            const schemaDuration = this.parseIsoDuration(
+                videoSchemaElement.querySelector('[itemprop="duration"]')?.getAttribute('content'),
+            );
 
             return {
                 date: this.getFormattedDateForContent(createdAt),
@@ -326,8 +341,8 @@ class YoutubeParser extends Parser {
                 videoDescription: description,
                 videoThumbnail: videoHTML.querySelector('meta[property="og:image"]')?.getAttribute('content') ?? '',
                 videoPlayer: this.getEmbedPlayer(videoId),
-                videoDuration: 0,
-                videoDurationFormatted: '',
+                videoDuration: schemaDuration ? toSeconds(schemaDuration) : 0,
+                videoDurationFormatted: schemaDuration ? this.formatDuration(schemaDuration) : '',
                 videoPublishDate:
                     publishedAt !== ''
                         ? typedMoment(publishedAt, [
@@ -352,6 +367,30 @@ class YoutubeParser extends Parser {
                 'Unable to parse Youtube schema from DOM.',
             );
         }
+    }
+
+    private parseIsoDuration(value: string | null | undefined): Duration | null {
+        if (!value) {
+            return null;
+        }
+        try {
+            return parse(value);
+        } catch {
+            return null;
+        }
+    }
+
+    private findPublishDate(jsonData: YoutubeInitialData): string | undefined {
+        // The panel index varies between videos, so search all engagement panels.
+        for (const panel of jsonData?.engagementPanels ?? []) {
+            const publishDate =
+                panel.engagementPanelSectionListRenderer?.content?.structuredDescriptionContentRenderer?.items?.[0]
+                    ?.videoDescriptionHeaderRenderer?.publishDate?.simpleText;
+            if (publishDate) {
+                return publishDate;
+            }
+        }
+        return undefined;
     }
 
     private formatDuration(duration: Duration): string {
@@ -547,15 +586,17 @@ class YoutubeParser extends Parser {
     }
 
     private decodeHtmlEntities(text: string): string {
-        return text
-            .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&quot;/g, '"')
-            .replace(/&#39;/g, "'")
-            .replace(/&apos;/g, "'")
-            .replace(/&#(\d+);/g, (_match: string, code: string) => String.fromCharCode(parseInt(code, 10)))
-            .replace(/&#x([a-fA-F0-9]+);/g, (_match: string, code: string) => String.fromCharCode(parseInt(code, 16)));
+        // Single pass so that e.g. "&amp;lt;" decodes to "&lt;" and not "<".
+        const named: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ' };
+        return text.replace(/&(#x[a-fA-F0-9]+|#\d+|[a-z]+);/g, (match: string, entity: string) => {
+            if (entity.startsWith('#x')) {
+                return String.fromCodePoint(parseInt(entity.slice(2), 16));
+            }
+            if (entity.startsWith('#')) {
+                return String.fromCodePoint(parseInt(entity.slice(1), 10));
+            }
+            return named[entity] ?? match;
+        });
     }
 
     private getEmbedPlayer(videoId: string): string {

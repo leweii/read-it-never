@@ -1,989 +1,823 @@
-import { App, Notice, Platform, PluginSettingTab, Setting } from 'obsidian';
+import {
+    App,
+    Debouncer,
+    Platform,
+    PluginSettingTab,
+    Setting,
+    TextAreaComponent,
+    TextComponent,
+    debounce,
+} from 'obsidian';
 import { Delimiter, getDelimiterOptions } from 'src/enums/delimiter';
 import { FileExistsStrategy, getFileExistStrategyOptions } from 'src/enums/fileExistsStrategy';
+import { formatCurrentDate } from 'src/helpers/date';
 import { getDefaultFilesystenLimits } from 'src/helpers/fileutils';
-import { createHTMLDiv } from 'src/helpers/setting';
 import { t } from 'src/i18n';
 import ReadItNeverPlugin from 'src/main';
-import { DEFAULT_SETTINGS } from 'src/settings';
+import { DEFAULT_SETTINGS, ReadItNeverSettingValue } from 'src/settings';
 
-enum DetailsItem {
-    ReadableArticle = 'readableArticle',
-    Youtube = 'youtube',
-    YoutubeChannel = 'youtubeChannel',
-    X = 'x',
-    Bilibili = 'bilibili',
-    Xiaoyuzhou = 'xiaoyuzhou',
-    Podcast = 'podcast',
-    NonReadableArticle = 'nonReadableArticle',
-    TextSnippet = 'textSnippet',
+const TEMPLATE_REFERENCE_URL = 'https://github.com/leweii/read-it-never#template-engine';
+const YOUTUBE_API_KEY_URL = 'https://developers.google.com/youtube/v3/getting-started';
+
+enum SettingsTabId {
+    General = 'general',
+    ContentTypes = 'contentTypes',
+    Integrations = 'integrations',
+    Advanced = 'advanced',
 }
+
+enum OpenNoteMode {
+    DoNotOpen = 'doNotOpen',
+    CurrentTab = 'currentTab',
+    NewTab = 'newTab',
+}
+
+interface ContentTypeDefinition {
+    id: string;
+    label: () => string;
+    slugKey: string;
+    titleKey: string;
+    noteKey: string;
+    titleVariables: string[];
+    noteVariables: string[];
+    renderExtra?: (containerEl: HTMLElement) => void;
+}
+
+type TemplateInput = TextComponent | TextAreaComponent;
 
 export class ReadItNeverSettingsTab extends PluginSettingTab {
     plugin: ReadItNeverPlugin;
 
-    private activeDetatils: DetailsItem[] = [];
+    private activeTab: SettingsTabId = SettingsTabId.General;
+    private activeContentType = 'article';
+    private readonly save: Debouncer<[], void>;
 
     constructor(app: App, plugin: ReadItNeverPlugin) {
         super(app, plugin);
         this.plugin = plugin;
+        // Text fields fire on every keystroke; batch writes to data.json.
+        this.save = debounce(() => void this.plugin.saveSettings(), 500, true);
     }
 
     display(): void {
         const { containerEl } = this;
-
         containerEl.empty();
+        containerEl.addClass('rin-settings');
 
-        new Setting(containerEl)
-            .setName(t('settings.inboxDir.name'))
-            .setDesc(t('settings.inboxDir.desc'))
-            .addText((text) =>
-                text
-                    .setPlaceholder(t('settings.inboxDir.placeholder'))
-                    .setValue(
-                        typeof this.plugin.settings.inboxDir === 'undefined'
-                            ? DEFAULT_SETTINGS.inboxDir
-                            : this.plugin.settings.inboxDir,
-                    )
+        this.renderTabBar(containerEl);
+
+        const tabContentEl = containerEl.createDiv({ cls: 'rin-settings-tab-content' });
+        switch (this.activeTab) {
+            case SettingsTabId.General:
+                this.renderGeneralTab(tabContentEl);
+                break;
+            case SettingsTabId.ContentTypes:
+                this.renderContentTypesTab(tabContentEl);
+                break;
+            case SettingsTabId.Integrations:
+                this.renderIntegrationsTab(tabContentEl);
+                break;
+            case SettingsTabId.Advanced:
+                this.renderAdvancedTab(tabContentEl);
+                break;
+        }
+    }
+
+    hide(): void {
+        // Flush pending debounced writes when the settings window closes.
+        this.save.run();
+        super.hide();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Layout
+    // ---------------------------------------------------------------------------------------------
+
+    private renderTabBar(containerEl: HTMLElement): void {
+        const tabs: { id: SettingsTabId; label: string }[] = [
+            { id: SettingsTabId.General, label: t('settings.tab.general') },
+            { id: SettingsTabId.ContentTypes, label: t('settings.tab.contentTypes') },
+            { id: SettingsTabId.Integrations, label: t('settings.tab.integrations') },
+            { id: SettingsTabId.Advanced, label: t('settings.tab.advanced') },
+        ];
+
+        const tabBarEl = containerEl.createDiv({ cls: 'rin-settings-tabs', attr: { role: 'tablist' } });
+        for (const tab of tabs) {
+            const tabEl = tabBarEl.createEl('button', {
+                text: tab.label,
+                cls: 'rin-settings-tab',
+                attr: { role: 'tab', 'aria-selected': String(tab.id === this.activeTab) },
+            });
+            tabEl.toggleClass('is-active', tab.id === this.activeTab);
+            tabEl.addEventListener('click', () => {
+                this.activeTab = tab.id;
+                this.display();
+            });
+        }
+    }
+
+    private addSection(containerEl: HTMLElement, title: string, description?: string): HTMLElement {
+        const sectionEl = containerEl.createDiv({ cls: 'rin-settings-section' });
+        new Setting(sectionEl).setName(title).setHeading();
+        if (description) {
+            sectionEl.createEl('p', { text: description, cls: 'rin-settings-section-desc setting-item-description' });
+        }
+        return sectionEl;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Tabs
+    // ---------------------------------------------------------------------------------------------
+
+    private renderGeneralTab(containerEl: HTMLElement): void {
+        const storageEl = this.addSection(containerEl, t('settings.section.storage'));
+        this.addTextSetting(storageEl, 'inboxDir', t('settings.inboxDir.name'), t('settings.inboxDir.desc'), {
+            placeholder: t('settings.inboxDir.placeholder'),
+        });
+        this.addTextSetting(storageEl, 'assetsDir', t('settings.assetsDir.name'), t('settings.assetsDir.desc'), {
+            placeholder: t('settings.assetsDir.placeholder'),
+        });
+
+        const afterEl = this.addSection(containerEl, t('settings.section.afterCreating'));
+        new Setting(afterEl)
+            .setName(t('settings.openNote.name'))
+            .setDesc(t('settings.openNote.desc'))
+            .addDropdown((dropdown) =>
+                dropdown
+                    .addOption(OpenNoteMode.DoNotOpen, t('settings.openNote.doNotOpen'))
+                    .addOption(OpenNoteMode.CurrentTab, t('settings.openNote.currentTab'))
+                    .addOption(OpenNoteMode.NewTab, t('settings.openNote.newTab'))
+                    .setValue(this.getOpenNoteMode())
                     .onChange(async (value) => {
-                        this.plugin.settings.inboxDir = value;
+                        this.plugin.settings.openNewNote = value === OpenNoteMode.CurrentTab;
+                        this.plugin.settings.openNewNoteInNewTab = value === OpenNoteMode.NewTab;
                         await this.plugin.saveSettings();
                     }),
             );
 
-        new Setting(containerEl)
-            .setName(t('settings.assetsDir.name'))
-            .setDesc(t('settings.assetsDir.desc'))
-            .addText((text) =>
-                text
-                    .setPlaceholder(t('settings.assetsDir.placeholder'))
-                    .setValue(
-                        typeof this.plugin.settings.assetsDir === 'undefined'
-                            ? DEFAULT_SETTINGS.inboxDir + '/assets'
-                            : this.plugin.settings.assetsDir,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.assetsDir = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(containerEl)
-            .setName(t('settings.openNewNote.name'))
-            .setDesc(t('settings.openNewNote.desc'))
-            .addToggle((toggle) =>
-                toggle
-                    .setValue(this.plugin.settings.openNewNote || DEFAULT_SETTINGS.openNewNote)
-                    .onChange(async (value) => {
-                        this.plugin.settings.openNewNote = value;
-                        if (value === true) {
-                            this.plugin.settings.openNewNoteInNewTab = false;
-                        }
-                        await this.plugin.saveSettings();
-                        this.display();
-                    }),
-            );
-
-        new Setting(containerEl)
-            .setName(t('settings.openNewNoteInNewTab.name'))
-            .setDesc(t('settings.openNewNoteInNewTab.desc'))
-            .addToggle((toggle) =>
-                toggle
-                    .setValue(this.plugin.settings.openNewNoteInNewTab || DEFAULT_SETTINGS.openNewNoteInNewTab)
-                    .onChange(async (value) => {
-                        this.plugin.settings.openNewNoteInNewTab = value;
-                        if (value === true) {
-                            this.plugin.settings.openNewNote = false;
-                        }
-                        await this.plugin.saveSettings();
-                        this.display();
-                    }),
-            );
-
-        new Setting(containerEl)
+        new Setting(afterEl)
             .setName(t('settings.fileExistsStrategy.name'))
             .setDesc(t('settings.fileExistsStrategy.desc'))
             .addDropdown((dropdown) => {
-                getFileExistStrategyOptions().forEach((fileExistsStrategyOption) => {
-                    dropdown.addOption(fileExistsStrategyOption.option, fileExistsStrategyOption.label);
-                });
-
-                dropdown.setValue(this.plugin.settings.fileExistsStrategy || DEFAULT_SETTINGS.fileExistsStrategy);
-
-                dropdown.onChange(async (value) => {
-                    this.plugin.settings.fileExistsStrategy = value as FileExistsStrategy;
-                    await this.plugin.saveSettings();
-                });
+                getFileExistStrategyOptions().forEach((option) => dropdown.addOption(option.option, option.label));
+                dropdown
+                    .setValue(this.plugin.settings.fileExistsStrategy ?? DEFAULT_SETTINGS.fileExistsStrategy)
+                    .onChange(async (value) => {
+                        this.plugin.settings.fileExistsStrategy = value as FileExistsStrategy;
+                        await this.plugin.saveSettings();
+                    });
             });
 
-        new Setting(containerEl)
+        const datesEl = this.addSection(containerEl, t('settings.section.dates'));
+        this.addDateFormatSetting(
+            datesEl,
+            'dateTitleFmt',
+            t('settings.dateTitleFmt.name'),
+            t('settings.dateTitleFmt.desc'),
+        );
+        this.addDateFormatSetting(
+            datesEl,
+            'dateContentFmt',
+            t('settings.dateContentFmt.name'),
+            t('settings.dateContentFmt.desc'),
+        );
+
+        const inputEl = this.addSection(containerEl, t('settings.section.input'));
+        new Setting(inputEl)
             .setName(t('settings.batchProcessDelimiter.name'))
             .setDesc(t('settings.batchProcessDelimiter.desc'))
             .addDropdown((dropdown) => {
-                getDelimiterOptions().forEach((delimiterOption) => {
-                    dropdown.addOption(delimiterOption.option, delimiterOption.label);
-                });
-
-                dropdown.setValue(this.plugin.settings.batchProcessDelimiter || DEFAULT_SETTINGS.batchProcessDelimiter);
-
-                dropdown.onChange(async (value) => {
-                    this.plugin.settings.batchProcessDelimiter = value as Delimiter;
-                    await this.plugin.saveSettings();
-                });
-            });
-
-        new Setting(containerEl)
-            .setName(t('settings.dateTitleFmt.name'))
-            .setDesc(t('settings.dateTitleFmt.desc'))
-            .addText((text) =>
-                text
-                    .setPlaceholder(t('settings.dateTitleFmt.placeholder', { fmt: DEFAULT_SETTINGS.dateTitleFmt }))
-                    .setValue(
-                        typeof this.plugin.settings.dateTitleFmt === 'undefined'
-                            ? DEFAULT_SETTINGS.dateTitleFmt
-                            : this.plugin.settings.dateTitleFmt,
-                    )
+                getDelimiterOptions().forEach((option) => dropdown.addOption(option.option, option.label));
+                dropdown
+                    .setValue(this.plugin.settings.batchProcessDelimiter ?? DEFAULT_SETTINGS.batchProcessDelimiter)
                     .onChange(async (value) => {
-                        this.plugin.settings.dateTitleFmt = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(containerEl)
-            .setName(t('settings.dateContentFmt.name'))
-            .setDesc(t('settings.dateContentFmt.desc'))
-            .addText((text) =>
-                text
-                    .setPlaceholder(t('settings.dateContentFmt.placeholder', { fmt: DEFAULT_SETTINGS.dateContentFmt }))
-                    .setValue(
-                        typeof this.plugin.settings.dateContentFmt === 'undefined'
-                            ? DEFAULT_SETTINGS.dateContentFmt
-                            : this.plugin.settings.dateContentFmt,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.dateContentFmt = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(containerEl)
-            .setName(t('settings.extendShareMenu.name'))
-            .setDesc(t('settings.extendShareMenu.desc'))
-            .addToggle((toggle) =>
-                toggle
-                    .setValue(
-                        Object.prototype.hasOwnProperty.call(this.plugin.settings, 'extendShareMenu')
-                            ? this.plugin.settings.extendShareMenu
-                            : DEFAULT_SETTINGS.extendShareMenu,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.extendShareMenu = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(containerEl)
-            .setName(t('settings.youtubeApiKey.name'))
-            .setDesc(t('settings.youtubeApiKey.desc'))
-            .addText((text) =>
-                text
-                    .setPlaceholder('')
-                    .setValue(this.plugin.settings.youtubeApiKey || DEFAULT_SETTINGS.youtubeApiKey)
-                    .onChange(async (value) => {
-                        this.plugin.settings.youtubeApiKey = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(containerEl).setName(t('settings.contentTypes.heading')).setHeading();
-        containerEl.createDiv({ text: t('settings.contentTypes.desc') });
-
-        let detailsEl: HTMLElement;
-
-        containerEl.createEl('hr', { cls: 'readitnever-setting-hr' });
-        detailsEl = this.createDetailsElement(containerEl, DetailsItem.ReadableArticle);
-        detailsEl.createEl('summary', {
-            text: t('settings.section.readableArticle'),
-            cls: 'readitnever-setting-h3',
-        });
-
-        new Setting(detailsEl)
-            .setName(t('settings.readableArticle.slug.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.parseableArticleContentType)
-                    .setValue(
-                        typeof this.plugin.settings.parseableArticleContentType === 'undefined'
-                            ? DEFAULT_SETTINGS.parseableArticleContentType
-                            : this.plugin.settings.parseableArticleContentType,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.parseableArticleContentType = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.readableArticle.title.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.parseableArticleNoteTitle)
-                    .setValue(
-                        this.plugin.settings.parseableArticleNoteTitle || DEFAULT_SETTINGS.parseableArticleNoteTitle,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.parseableArticleNoteTitle = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.readableArticle.template.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addTextArea((textarea) => {
-                textarea
-                    .setValue(this.plugin.settings.parsableArticleNote || DEFAULT_SETTINGS.parsableArticleNote)
-                    .onChange(async (value) => {
-                        this.plugin.settings.parsableArticleNote = value;
+                        this.plugin.settings.batchProcessDelimiter = value as Delimiter;
                         await this.plugin.saveSettings();
                     });
-                textarea.inputEl.rows = 10;
-                textarea.inputEl.cols = 25;
             });
+        this.addToggleSetting(
+            inputEl,
+            'extendShareMenu',
+            t('settings.extendShareMenu.name'),
+            t('settings.extendShareMenu.desc'),
+        );
+    }
 
-        new Setting(detailsEl)
-            .setName(t('settings.readableArticle.downloadImages.name'))
-            .setDesc(t('settings.readableArticle.downloadImages.desc'))
-            .addToggle((toggle) =>
-                toggle
-                    .setValue(
-                        Object.prototype.hasOwnProperty.call(this.plugin.settings, 'downloadImages')
-                            ? this.plugin.settings.downloadImages
-                            : DEFAULT_SETTINGS.downloadImages,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.downloadImages = value;
-                        if (value === false) {
-                            this.plugin.settings.downloadImagesInArticleDir = false;
-                        }
-                        await this.plugin.saveSettings();
+    private renderContentTypesTab(containerEl: HTMLElement): void {
+        const definitions = this.getContentTypeDefinitions();
+        const active = definitions.find((definition) => definition.id === this.activeContentType) ?? definitions[0];
+
+        containerEl.createEl('p', {
+            text: t('settings.contentTypes.desc'),
+            cls: 'setting-item-description rin-settings-section-desc',
+        });
+
+        const pillsEl = containerEl.createDiv({ cls: 'rin-content-type-pills' });
+        for (const definition of definitions) {
+            const pillEl = pillsEl.createEl('button', { text: definition.label(), cls: 'rin-content-type-pill' });
+            pillEl.toggleClass('is-active', definition.id === active.id);
+            pillEl.addEventListener('click', () => {
+                this.activeContentType = definition.id;
+                this.display();
+            });
+        }
+
+        const noteEl = this.addSection(containerEl, t('settings.section.noteTemplate'));
+        noteEl.createEl('p', { cls: 'setting-item-description rin-settings-section-desc' }, (descEl) => {
+            descEl.appendText(t('settings.templateVariableReference.see'));
+            descEl.createEl('a', { text: t('settings.templateVariableReference.link'), href: TEMPLATE_REFERENCE_URL });
+        });
+
+        this.addTemplateSetting(noteEl, active.titleKey, t('settings.contentType.title.name'), active.titleVariables, {
+            multiline: false,
+        });
+        this.addTemplateSetting(noteEl, active.noteKey, t('settings.contentType.template.name'), active.noteVariables, {
+            multiline: true,
+        });
+        this.addTextSetting(
+            noteEl,
+            active.slugKey,
+            t('settings.contentType.slug.name'),
+            t('settings.contentType.slug.desc'),
+            {
+                placeholder: String(DEFAULT_SETTINGS[active.slugKey]),
+                resettable: true,
+            },
+        );
+
+        active.renderExtra?.(containerEl);
+    }
+
+    private renderIntegrationsTab(containerEl: HTMLElement): void {
+        const youtubeEl = this.addSection(containerEl, 'YouTube');
+        const youtubeKeyDesc = createFragment((fragment) => {
+            fragment.appendText(t('settings.youtubeApiKey.desc'));
+            fragment.createEl('br');
+            fragment.createEl('a', { text: t('settings.youtubeApiKey.howTo'), href: YOUTUBE_API_KEY_URL });
+        });
+        this.addSecretSetting(youtubeEl, 'youtubeApiKey', t('settings.youtubeApiKey.name'), youtubeKeyDesc);
+
+        const bilibiliEl = this.addSection(containerEl, t('settings.section.bilibili'));
+        this.addSecretSetting(
+            bilibiliEl,
+            'bilibiliSessdata',
+            t('settings.bilibili.sessdata.name'),
+            t('settings.bilibili.sessdata.desc'),
+        );
+
+        containerEl.createEl('p', {
+            text: t('settings.integrations.storageNote'),
+            cls: 'setting-item-description rin-settings-section-desc',
+        });
+    }
+
+    private renderAdvancedTab(containerEl: HTMLElement): void {
+        const defaultLimits = getDefaultFilesystenLimits(Platform);
+        const limitsEl = this.addSection(
+            containerEl,
+            t('settings.section.filesystemLimits'),
+            t('settings.filesystemLimits.desc'),
+        );
+
+        this.addOptionalNumberSetting(
+            limitsEl,
+            'filesystemLimitPath',
+            t('settings.filesystemLimitPath.name'),
+            t('settings.filesystemLimitPath.desc', { limit: defaultLimits.path }),
+            defaultLimits.path,
+        );
+        this.addOptionalNumberSetting(
+            limitsEl,
+            'filesystemLimitFileName',
+            t('settings.filesystemLimitFileName.name'),
+            t('settings.filesystemLimitFileName.desc', { limit: defaultLimits.fileName }),
+            defaultLimits.fileName,
+        );
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Content type definitions
+    // ---------------------------------------------------------------------------------------------
+
+    private getContentTypeDefinitions(): ContentTypeDefinition[] {
+        const titleVariables = ['title', 'date'];
+
+        return [
+            {
+                id: 'article',
+                label: () => t('settings.section.readableArticle'),
+                slugKey: 'parseableArticleContentType',
+                titleKey: 'parseableArticleNoteTitle',
+                noteKey: 'parsableArticleNote',
+                titleVariables,
+                noteVariables: [
+                    'articleTitle',
+                    'articleURL',
+                    'articleContent',
+                    'articleReadingTime',
+                    'siteName',
+                    'author',
+                    'previewURL',
+                    'publishedTime',
+                    'articleOgDescription',
+                    'date',
+                ],
+                renderExtra: (containerEl) => this.renderImageSettings(containerEl),
+            },
+            {
+                id: 'youtube',
+                label: () => 'YouTube',
+                slugKey: 'youtubeContentTypeSlug',
+                titleKey: 'youtubeNoteTitle',
+                noteKey: 'youtubeNote',
+                titleVariables,
+                noteVariables: [
+                    'videoTitle',
+                    'videoURL',
+                    'videoPlayer',
+                    'videoChapters',
+                    'videoTranscript',
+                    'videoDescription',
+                    'videoThumbnail',
+                    'videoDurationFormatted',
+                    'videoPublishDate',
+                    'videoViewsCount',
+                    'videoTags',
+                    'channelName',
+                    'channelURL',
+                    'date',
+                ],
+                renderExtra: (containerEl) => this.renderYoutubeSettings(containerEl),
+            },
+            {
+                id: 'youtubeChannel',
+                label: () => t('settings.section.youtubeChannel'),
+                slugKey: 'youtubeChannelContentTypeSlug',
+                titleKey: 'youtubeChannelNoteTitle',
+                noteKey: 'youtubeChannelNote',
+                titleVariables,
+                noteVariables: [
+                    'channelTitle',
+                    'channelURL',
+                    'channelDescription',
+                    'channelAvatar',
+                    'channelBanner',
+                    'channelSubscribersCount',
+                    'channelVideosCount',
+                    'channelVideosURL',
+                    'channelShortsURL',
+                    'date',
+                ],
+            },
+            {
+                id: 'bilibili',
+                label: () => t('settings.section.bilibili'),
+                slugKey: 'bilibiliContentTypeSlug',
+                titleKey: 'bilibiliNoteTitle',
+                noteKey: 'bilibiliNote',
+                titleVariables,
+                noteVariables: [
+                    'videoTitle',
+                    'videoURL',
+                    'videoPlayer',
+                    'videoParts',
+                    'videoTranscript',
+                    'videoDescription',
+                    'videoThumbnail',
+                    'videoDurationFormatted',
+                    'videoPublishDate',
+                    'videoViewsCount',
+                    'channelName',
+                    'channelURL',
+                    'date',
+                ],
+                renderExtra: (containerEl) => this.renderBilibiliSettings(containerEl),
+            },
+            {
+                id: 'x',
+                label: () => 'X (Twitter)',
+                slugKey: 'twitterContentTypeSlug',
+                titleKey: 'twitterNoteTitle',
+                noteKey: 'twitterNote',
+                titleVariables: ['tweetAuthorName', 'date'],
+                noteVariables: ['tweetAuthorName', 'tweetURL', 'tweetContent', 'tweetPublishDate', 'date'],
+            },
+            {
+                id: 'xiaoyuzhou',
+                label: () => t('settings.section.xiaoyuzhou'),
+                slugKey: 'xiaoyuzhouContentTypeSlug',
+                titleKey: 'xiaoyuzhouNoteTitle',
+                noteKey: 'xiaoyuzhouNote',
+                titleVariables,
+                noteVariables: [
+                    'episodeTitle',
+                    'episodeURL',
+                    'episodePlayer',
+                    'episodeDescription',
+                    'episodeThumbnail',
+                    'episodeDurationFormatted',
+                    'episodePublishDate',
+                    'podcastName',
+                    'podcastAuthor',
+                    'podcastURL',
+                    'audioURL',
+                    'date',
+                ],
+            },
+            {
+                id: 'podcast',
+                label: () => t('settings.section.podcast'),
+                slugKey: 'podcastContentTypeSlug',
+                titleKey: 'podcastNoteTitle',
+                noteKey: 'podcastNote',
+                titleVariables,
+                noteVariables: [
+                    'episodeTitle',
+                    'episodeURL',
+                    'episodePlayer',
+                    'episodeDescription',
+                    'episodeThumbnail',
+                    'episodeDurationFormatted',
+                    'episodePublishDate',
+                    'podcastName',
+                    'podcastAuthor',
+                    'feedURL',
+                    'audioURL',
+                    'date',
+                ],
+            },
+            {
+                id: 'nonReadableArticle',
+                label: () => t('settings.section.nonReadableArticle'),
+                slugKey: 'notParseableArticleContentType',
+                titleKey: 'notParseableArticleNoteTitle',
+                noteKey: 'notParsableArticleNote',
+                titleVariables,
+                noteVariables: ['articleURL', 'articleTitle', 'articleOgDescription', 'siteName', 'previewURL'],
+            },
+            {
+                id: 'textSnippet',
+                label: () => t('settings.section.textSnippet'),
+                slugKey: 'textSnippetContentType',
+                titleKey: 'textSnippetNoteTitle',
+                noteKey: 'textSnippetNote',
+                titleVariables: ['date'],
+                noteVariables: ['content', 'date'],
+            },
+        ];
+    }
+
+    private renderImageSettings(containerEl: HTMLElement): void {
+        const imagesEl = this.addSection(containerEl, t('settings.section.images'));
+        this.addToggleSetting(
+            imagesEl,
+            'downloadImages',
+            t('settings.readableArticle.downloadImages.name'),
+            t('settings.readableArticle.downloadImages.desc'),
+            { rerender: true },
+        );
+
+        if (this.plugin.settings.downloadImages) {
+            this.addToggleSetting(
+                imagesEl,
+                'downloadImagesInArticleDir',
+                t('settings.readableArticle.downloadImagesInArticleDir.name'),
+                t('settings.readableArticle.downloadImagesInArticleDir.desc'),
+            );
+        }
+    }
+
+    private renderYoutubeSettings(containerEl: HTMLElement): void {
+        const playerEl = this.addSection(containerEl, t('settings.section.player'));
+        this.addEmbedSizeSetting(playerEl, 'youtubeEmbedWidth', 'youtubeEmbedHeight');
+        this.addToggleSetting(
+            playerEl,
+            'youtubeUsePrivacyEnhancedEmbed',
+            t('settings.youtube.privacyEnhanced.name'),
+            t('settings.youtube.privacyEnhanced.desc'),
+        );
+
+        const chaptersEl = this.addSection(containerEl, t('settings.section.chapters'));
+        this.addTemplateSetting(
+            chaptersEl,
+            'youtubeChapter',
+            t('settings.youtube.chapter.name'),
+            ['chapterTimestamp', 'chapterTitle', 'chapterUrl', 'chapterSeconds'],
+            { multiline: false },
+        );
+
+        this.renderTranscriptSettings(containerEl, 'youtube', 'en');
+    }
+
+    private renderBilibiliSettings(containerEl: HTMLElement): void {
+        const playerEl = this.addSection(containerEl, t('settings.section.player'));
+        this.addEmbedSizeSetting(playerEl, 'bilibiliEmbedWidth', 'bilibiliEmbedHeight');
+
+        this.renderTranscriptSettings(containerEl, 'bilibili', 'zh-CN');
+
+        if (this.plugin.settings.bilibiliFetchTranscript && !this.plugin.settings.bilibiliSessdata) {
+            containerEl.createDiv({ cls: 'rin-settings-callout' }, (calloutEl) => {
+                calloutEl.appendText(t('settings.bilibili.sessdataMissing'));
+                calloutEl
+                    .createEl('a', { text: t('settings.tab.integrations'), href: '#' })
+                    .addEventListener('click', (event) => {
+                        event.preventDefault();
+                        this.activeTab = SettingsTabId.Integrations;
                         this.display();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.readableArticle.downloadImagesInArticleDir.name'))
-            .setDesc(t('settings.readableArticle.downloadImagesInArticleDir.desc'))
-            .addToggle((toggle) =>
-                toggle
-                    .setValue(
-                        Object.prototype.hasOwnProperty.call(this.plugin.settings, 'downloadImagesInArticleDir')
-                            ? this.plugin.settings.downloadImagesInArticleDir
-                            : DEFAULT_SETTINGS.downloadImagesInArticleDir,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.downloadImagesInArticleDir = value;
-                        if (value === true) {
-                            this.plugin.settings.downloadImages = true;
-                        }
-                        await this.plugin.saveSettings();
-                        this.display();
-                    }),
-            );
-
-        containerEl.createEl('hr', { cls: 'readitnever-setting-hr' });
-        detailsEl = this.createDetailsElement(containerEl, DetailsItem.Youtube);
-        detailsEl.createEl('summary', {
-            text: 'YouTube',
-            cls: 'readitnever-setting-h3',
-        });
-
-        new Setting(detailsEl)
-            .setName(t('settings.youtube.slug.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.youtubeContentTypeSlug)
-                    .setValue(
-                        typeof this.plugin.settings.youtubeContentTypeSlug === 'undefined'
-                            ? DEFAULT_SETTINGS.youtubeContentTypeSlug
-                            : this.plugin.settings.youtubeContentTypeSlug,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.youtubeContentTypeSlug = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.youtube.title.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.youtubeNoteTitle)
-                    .setValue(this.plugin.settings.youtubeNoteTitle || DEFAULT_SETTINGS.youtubeNoteTitle)
-                    .onChange(async (value) => {
-                        this.plugin.settings.youtubeNoteTitle = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.youtube.template.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addTextArea((textarea) => {
-                textarea
-                    .setValue(this.plugin.settings.youtubeNote || DEFAULT_SETTINGS.youtubeNote)
-                    .onChange(async (value) => {
-                        this.plugin.settings.youtubeNote = value;
-                        await this.plugin.saveSettings();
                     });
-                textarea.inputEl.rows = 10;
-                textarea.inputEl.cols = 25;
             });
+        }
+    }
 
-        new Setting(detailsEl)
-            .setName(t('settings.youtube.chapter.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addTextArea((textarea) => {
-                textarea
-                    .setValue(this.plugin.settings.youtubeChapter || DEFAULT_SETTINGS.youtubeChapter)
-                    .onChange(async (value) => {
-                        this.plugin.settings.youtubeChapter = value;
-                        await this.plugin.saveSettings();
-                    });
-                textarea.inputEl.rows = 10;
-                textarea.inputEl.cols = 25;
-            });
-
-        new Setting(detailsEl).setName(t('settings.youtube.embedWidth.name')).addText((text) =>
-            text
-                .setPlaceholder(DEFAULT_SETTINGS.youtubeEmbedWidth)
-                .setValue(this.plugin.settings.youtubeEmbedWidth || DEFAULT_SETTINGS.youtubeEmbedWidth)
-                .onChange(async (value) => {
-                    this.plugin.settings.youtubeEmbedWidth = value;
-                    await this.plugin.saveSettings();
-                }),
+    private renderTranscriptSettings(
+        containerEl: HTMLElement,
+        prefix: 'youtube' | 'bilibili',
+        languagePlaceholder: string,
+    ): void {
+        const transcriptEl = this.addSection(containerEl, t('settings.section.transcript'));
+        this.addToggleSetting(
+            transcriptEl,
+            `${prefix}FetchTranscript`,
+            t(`settings.${prefix}.fetchTranscript.name`),
+            t(`settings.${prefix}.fetchTranscript.desc`),
+            { rerender: true },
         );
 
-        new Setting(detailsEl).setName(t('settings.youtube.embedHeight.name')).addText((text) =>
-            text
-                .setPlaceholder(DEFAULT_SETTINGS.youtubeEmbedHeight)
-                .setValue(this.plugin.settings.youtubeEmbedHeight || DEFAULT_SETTINGS.youtubeEmbedHeight)
-                .onChange(async (value) => {
-                    this.plugin.settings.youtubeEmbedHeight = value;
-                    await this.plugin.saveSettings();
-                }),
+        if (!this.plugin.settings[`${prefix}FetchTranscript`]) {
+            return;
+        }
+
+        this.addTextSetting(
+            transcriptEl,
+            `${prefix}TranscriptLanguage`,
+            t(`settings.${prefix}.transcriptLanguage.name`),
+            t(`settings.${prefix}.transcriptLanguage.desc`),
+            { placeholder: languagePlaceholder, trim: true },
         );
-
-        new Setting(detailsEl)
-            .setName(t('settings.youtube.privacyEnhanced.name'))
-            .setDesc(t('settings.youtube.privacyEnhanced.desc'))
-            .addToggle((toggle) =>
-                toggle
-                    .setValue(
-                        Object.prototype.hasOwnProperty.call(this.plugin.settings, 'youtubeUsePrivacyEnhancedEmbed')
-                            ? this.plugin.settings.youtubeUsePrivacyEnhancedEmbed
-                            : DEFAULT_SETTINGS.youtubeUsePrivacyEnhancedEmbed,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.youtubeUsePrivacyEnhancedEmbed = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.youtube.fetchTranscript.name'))
-            .setDesc(t('settings.youtube.fetchTranscript.desc'))
-            .addToggle((toggle) =>
-                toggle
-                    .setValue(
-                        Object.prototype.hasOwnProperty.call(this.plugin.settings, 'youtubeFetchTranscript')
-                            ? this.plugin.settings.youtubeFetchTranscript
-                            : DEFAULT_SETTINGS.youtubeFetchTranscript,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.youtubeFetchTranscript = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.youtube.transcriptLanguage.name'))
-            .setDesc(t('settings.youtube.transcriptLanguage.desc'))
-            .addText((text) =>
-                text
-                    .setPlaceholder('en')
-                    .setValue(
-                        this.plugin.settings.youtubeTranscriptLanguage || DEFAULT_SETTINGS.youtubeTranscriptLanguage,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.youtubeTranscriptLanguage = value.trim();
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.youtube.transcriptLine.name'))
-            .setDesc(t('settings.youtube.transcriptLine.desc'))
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.youtubeTranscriptLine)
-                    .setValue(this.plugin.settings.youtubeTranscriptLine || DEFAULT_SETTINGS.youtubeTranscriptLine)
-                    .onChange(async (value) => {
-                        this.plugin.settings.youtubeTranscriptLine = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.youtube.transcriptLinesPerBlock.name'))
-            .setDesc(t('settings.youtube.transcriptLinesPerBlock.desc'))
-            .addText((text) =>
-                text
-                    .setPlaceholder(String(DEFAULT_SETTINGS.youtubeTranscriptLinesPerBlock))
-                    .setValue(
-                        String(
-                            this.plugin.settings.youtubeTranscriptLinesPerBlock ||
-                                DEFAULT_SETTINGS.youtubeTranscriptLinesPerBlock,
-                        ),
-                    )
-                    .onChange(async (value) => {
-                        const parsed = parseInt(value, 10);
-                        this.plugin.settings.youtubeTranscriptLinesPerBlock =
-                            Number.isNaN(parsed) || parsed < 1
-                                ? DEFAULT_SETTINGS.youtubeTranscriptLinesPerBlock
-                                : parsed;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        containerEl.createEl('hr', { cls: 'readitnever-setting-hr' });
-        detailsEl = this.createDetailsElement(containerEl, DetailsItem.YoutubeChannel);
-        detailsEl.createEl('summary', {
-            text: t('settings.section.youtubeChannel'),
-            cls: 'readitnever-setting-h3',
-        });
-
-        new Setting(detailsEl)
-            .setName(t('settings.youtubeChannel.slug.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.youtubeChannelContentTypeSlug)
-                    .setValue(
-                        typeof this.plugin.settings.youtubeChannelContentTypeSlug === 'undefined'
-                            ? DEFAULT_SETTINGS.youtubeChannelContentTypeSlug
-                            : this.plugin.settings.youtubeChannelContentTypeSlug,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.youtubeChannelContentTypeSlug = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.youtubeChannel.title.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.youtubeChannelNoteTitle)
-                    .setValue(this.plugin.settings.youtubeChannelNoteTitle || DEFAULT_SETTINGS.youtubeChannelNoteTitle)
-                    .onChange(async (value) => {
-                        this.plugin.settings.youtubeChannelNoteTitle = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.youtubeChannel.template.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addTextArea((textarea) => {
-                textarea
-                    .setValue(this.plugin.settings.youtubeChannelNote || DEFAULT_SETTINGS.youtubeChannelNote)
-                    .onChange(async (value) => {
-                        this.plugin.settings.youtubeChannelNote = value;
-                        await this.plugin.saveSettings();
-                    });
-                textarea.inputEl.rows = 10;
-                textarea.inputEl.cols = 25;
-            });
-
-        containerEl.createEl('hr', { cls: 'readitnever-setting-hr' });
-        detailsEl = this.createDetailsElement(containerEl, DetailsItem.X);
-        detailsEl.createEl('summary', {
-            text: 'X.com',
-            cls: 'readitnever-setting-h3',
-        });
-
-        new Setting(detailsEl)
-            .setName(t('settings.x.slug.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.twitterContentTypeSlug)
-                    .setValue(
-                        typeof this.plugin.settings.twitterContentTypeSlug === 'undefined'
-                            ? DEFAULT_SETTINGS.twitterContentTypeSlug
-                            : this.plugin.settings.twitterContentTypeSlug,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.twitterContentTypeSlug = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.x.title.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.twitterNoteTitle)
-                    .setValue(this.plugin.settings.twitterNoteTitle || DEFAULT_SETTINGS.twitterNoteTitle)
-                    .onChange(async (value) => {
-                        this.plugin.settings.twitterNoteTitle = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-        new Setting(detailsEl)
-            .setName(t('settings.x.template.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addTextArea((textarea) => {
-                textarea
-                    .setValue(this.plugin.settings.twitterNote || DEFAULT_SETTINGS.twitterNote)
-                    .onChange(async (value) => {
-                        this.plugin.settings.twitterNote = value;
-                        await this.plugin.saveSettings();
-                    });
-                textarea.inputEl.rows = 10;
-                textarea.inputEl.cols = 25;
-            });
-
-        containerEl.createEl('hr', { cls: 'readitnever-setting-hr' });
-        detailsEl = this.createDetailsElement(containerEl, DetailsItem.Bilibili);
-        detailsEl.createEl('summary', {
-            text: 'Bilibili',
-            cls: 'readitnever-setting-h3',
-        });
-
-        new Setting(detailsEl)
-            .setName(t('settings.bilibili.slug.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.bilibiliContentTypeSlug)
-                    .setValue(
-                        typeof this.plugin.settings.bilibiliContentTypeSlug === 'undefined'
-                            ? DEFAULT_SETTINGS.bilibiliContentTypeSlug
-                            : this.plugin.settings.bilibiliContentTypeSlug,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.bilibiliContentTypeSlug = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.bilibili.title.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.bilibiliNoteTitle)
-                    .setValue(this.plugin.settings.bilibiliNoteTitle || DEFAULT_SETTINGS.bilibiliNoteTitle)
-                    .onChange(async (value) => {
-                        this.plugin.settings.bilibiliNoteTitle = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.bilibili.template.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addTextArea((textarea) => {
-                textarea
-                    .setValue(this.plugin.settings.bilibiliNote || DEFAULT_SETTINGS.bilibiliNote)
-                    .onChange(async (value) => {
-                        this.plugin.settings.bilibiliNote = value;
-                        await this.plugin.saveSettings();
-                    });
-                textarea.inputEl.rows = 10;
-                textarea.inputEl.cols = 25;
-            });
-
-        new Setting(detailsEl).setName(t('settings.bilibili.embedWidth.name')).addText((text) =>
-            text
-                .setPlaceholder(DEFAULT_SETTINGS.bilibiliEmbedWidth)
-                .setValue(this.plugin.settings.bilibiliEmbedWidth || DEFAULT_SETTINGS.bilibiliEmbedWidth)
-                .onChange(async (value) => {
-                    this.plugin.settings.bilibiliEmbedWidth = value;
-                    await this.plugin.saveSettings();
-                }),
+        this.addTemplateSetting(
+            transcriptEl,
+            `${prefix}TranscriptLine`,
+            t(`settings.${prefix}.transcriptLine.name`),
+            ['transcriptTimestamp', 'transcriptText', 'transcriptUrl', 'transcriptSeconds'],
+            { multiline: false },
         );
-
-        new Setting(detailsEl).setName(t('settings.bilibili.embedHeight.name')).addText((text) =>
-            text
-                .setPlaceholder(DEFAULT_SETTINGS.bilibiliEmbedHeight)
-                .setValue(this.plugin.settings.bilibiliEmbedHeight || DEFAULT_SETTINGS.bilibiliEmbedHeight)
-                .onChange(async (value) => {
-                    this.plugin.settings.bilibiliEmbedHeight = value;
-                    await this.plugin.saveSettings();
-                }),
+        this.addNumberSetting(
+            transcriptEl,
+            `${prefix}TranscriptLinesPerBlock`,
+            t(`settings.${prefix}.transcriptLinesPerBlock.name`),
+            t(`settings.${prefix}.transcriptLinesPerBlock.desc`),
         );
+    }
 
-        new Setting(detailsEl)
-            .setName(t('settings.bilibili.fetchTranscript.name'))
-            .setDesc(t('settings.bilibili.fetchTranscript.desc'))
-            .addToggle((toggle) =>
-                toggle
-                    .setValue(
-                        Object.prototype.hasOwnProperty.call(this.plugin.settings, 'bilibiliFetchTranscript')
-                            ? this.plugin.settings.bilibiliFetchTranscript
-                            : DEFAULT_SETTINGS.bilibiliFetchTranscript,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.bilibiliFetchTranscript = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
+    // ---------------------------------------------------------------------------------------------
+    // Setting builders
+    // ---------------------------------------------------------------------------------------------
 
-        new Setting(detailsEl)
-            .setName(t('settings.bilibili.sessdata.name'))
-            .setDesc(t('settings.bilibili.sessdata.desc'))
-            .addText((text) =>
-                text
-                    .setValue(this.plugin.settings.bilibiliSessdata || DEFAULT_SETTINGS.bilibiliSessdata)
-                    .onChange(async (value) => {
-                        this.plugin.settings.bilibiliSessdata = value.trim();
-                        await this.plugin.saveSettings();
-                    }),
-            );
+    private getOpenNoteMode(): OpenNoteMode {
+        if (this.plugin.settings.openNewNoteInNewTab) {
+            return OpenNoteMode.NewTab;
+        }
+        return this.plugin.settings.openNewNote ? OpenNoteMode.CurrentTab : OpenNoteMode.DoNotOpen;
+    }
 
-        new Setting(detailsEl)
-            .setName(t('settings.bilibili.transcriptLanguage.name'))
-            .setDesc(t('settings.bilibili.transcriptLanguage.desc'))
-            .addText((text) =>
-                text
-                    .setPlaceholder('zh-CN')
-                    .setValue(
-                        this.plugin.settings.bilibiliTranscriptLanguage || DEFAULT_SETTINGS.bilibiliTranscriptLanguage,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.bilibiliTranscriptLanguage = value.trim();
-                        await this.plugin.saveSettings();
-                    }),
-            );
+    private getValue(key: string): ReadItNeverSettingValue {
+        return this.plugin.settings[key] ?? DEFAULT_SETTINGS[key];
+    }
 
-        new Setting(detailsEl)
-            .setName(t('settings.bilibili.transcriptLine.name'))
-            .setDesc(t('settings.bilibili.transcriptLine.desc'))
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.bilibiliTranscriptLine)
-                    .setValue(this.plugin.settings.bilibiliTranscriptLine || DEFAULT_SETTINGS.bilibiliTranscriptLine)
-                    .onChange(async (value) => {
-                        this.plugin.settings.bilibiliTranscriptLine = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
+    private setValue(key: string, value: ReadItNeverSettingValue): void {
+        this.plugin.settings[key] = value;
+        this.save();
+    }
 
-        new Setting(detailsEl)
-            .setName(t('settings.bilibili.transcriptLinesPerBlock.name'))
-            .setDesc(t('settings.bilibili.transcriptLinesPerBlock.desc'))
-            .addText((text) =>
-                text
-                    .setPlaceholder(String(DEFAULT_SETTINGS.bilibiliTranscriptLinesPerBlock))
-                    .setValue(
-                        String(
-                            this.plugin.settings.bilibiliTranscriptLinesPerBlock ||
-                                DEFAULT_SETTINGS.bilibiliTranscriptLinesPerBlock,
-                        ),
-                    )
-                    .onChange(async (value) => {
-                        const parsed = parseInt(value, 10);
-                        this.plugin.settings.bilibiliTranscriptLinesPerBlock =
-                            Number.isNaN(parsed) || parsed < 1
-                                ? DEFAULT_SETTINGS.bilibiliTranscriptLinesPerBlock
-                                : parsed;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        containerEl.createEl('hr', { cls: 'readitnever-setting-hr' });
-        detailsEl = this.createDetailsElement(containerEl, DetailsItem.Xiaoyuzhou);
-        detailsEl.createEl('summary', {
-            text: 'Xiaoyuzhou',
-            cls: 'readitnever-setting-h3',
-        });
-
-        new Setting(detailsEl)
-            .setName(t('settings.xiaoyuzhou.slug.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.xiaoyuzhouContentTypeSlug)
-                    .setValue(
-                        typeof this.plugin.settings.xiaoyuzhouContentTypeSlug === 'undefined'
-                            ? DEFAULT_SETTINGS.xiaoyuzhouContentTypeSlug
-                            : this.plugin.settings.xiaoyuzhouContentTypeSlug,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.xiaoyuzhouContentTypeSlug = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.xiaoyuzhou.title.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.xiaoyuzhouNoteTitle)
-                    .setValue(this.plugin.settings.xiaoyuzhouNoteTitle || DEFAULT_SETTINGS.xiaoyuzhouNoteTitle)
-                    .onChange(async (value) => {
-                        this.plugin.settings.xiaoyuzhouNoteTitle = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.xiaoyuzhou.template.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addTextArea((textarea) => {
-                textarea
-                    .setValue(this.plugin.settings.xiaoyuzhouNote || DEFAULT_SETTINGS.xiaoyuzhouNote)
-                    .onChange(async (value) => {
-                        this.plugin.settings.xiaoyuzhouNote = value;
-                        await this.plugin.saveSettings();
-                    });
-                textarea.inputEl.rows = 10;
-                textarea.inputEl.cols = 25;
+    private addTextSetting(
+        containerEl: HTMLElement,
+        key: string,
+        name: string,
+        desc: string | DocumentFragment,
+        options: { placeholder?: string; trim?: boolean; resettable?: boolean } = {},
+    ): Setting {
+        let input: TextComponent;
+        const setting = new Setting(containerEl)
+            .setName(name)
+            .setDesc(desc)
+            .addText((text) => {
+                input = text;
+                text.setPlaceholder(options.placeholder ?? '')
+                    .setValue(String(this.getValue(key) ?? ''))
+                    .onChange((value) => this.setValue(key, options.trim ? value.trim() : value));
             });
 
-        containerEl.createEl('hr', { cls: 'readitnever-setting-hr' });
-        detailsEl = this.createDetailsElement(containerEl, DetailsItem.Podcast);
-        detailsEl.createEl('summary', {
-            text: t('settings.section.podcast'),
-            cls: 'readitnever-setting-h3',
-        });
+        if (options.resettable) {
+            this.addResetButton(setting, key, () => input.setValue(String(DEFAULT_SETTINGS[key])));
+        }
 
-        new Setting(detailsEl)
-            .setName(t('settings.podcast.slug.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.podcastContentTypeSlug)
-                    .setValue(
-                        typeof this.plugin.settings.podcastContentTypeSlug === 'undefined'
-                            ? DEFAULT_SETTINGS.podcastContentTypeSlug
-                            : this.plugin.settings.podcastContentTypeSlug,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.podcastContentTypeSlug = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
+        return setting;
+    }
 
-        new Setting(detailsEl)
-            .setName(t('settings.podcast.title.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.podcastNoteTitle)
-                    .setValue(this.plugin.settings.podcastNoteTitle || DEFAULT_SETTINGS.podcastNoteTitle)
-                    .onChange(async (value) => {
-                        this.plugin.settings.podcastNoteTitle = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.podcast.template.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addTextArea((textarea) => {
-                textarea
-                    .setValue(this.plugin.settings.podcastNote || DEFAULT_SETTINGS.podcastNote)
-                    .onChange(async (value) => {
-                        this.plugin.settings.podcastNote = value;
-                        await this.plugin.saveSettings();
-                    });
-                textarea.inputEl.rows = 10;
-                textarea.inputEl.cols = 25;
-            });
-
-        containerEl.createEl('hr', { cls: 'readitnever-setting-hr' });
-        detailsEl = this.createDetailsElement(containerEl, DetailsItem.NonReadableArticle);
-        detailsEl.createEl('summary', {
-            text: t('settings.section.nonReadableArticle'),
-            cls: 'readitnever-setting-h3',
-        });
-
-        new Setting(detailsEl)
-            .setName(t('settings.nonReadableArticle.slug.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.notParseableArticleContentType)
-                    .setValue(
-                        typeof this.plugin.settings.notParseableArticleContentType === 'undefined'
-                            ? DEFAULT_SETTINGS.notParseableArticleContentType
-                            : this.plugin.settings.notParseableArticleContentType,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.notParseableArticleContentType = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.nonReadableArticle.title.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.notParseableArticleNoteTitle)
-                    .setValue(
-                        this.plugin.settings.notParseableArticleNoteTitle ||
-                            DEFAULT_SETTINGS.notParseableArticleNoteTitle,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.notParseableArticleNoteTitle = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.nonReadableArticle.template.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addTextArea((textarea) => {
-                textarea
-                    .setValue(this.plugin.settings.notParsableArticleNote || DEFAULT_SETTINGS.notParsableArticleNote)
-                    .onChange(async (value) => {
-                        this.plugin.settings.notParsableArticleNote = value;
-                        await this.plugin.saveSettings();
-                    });
-                textarea.inputEl.rows = 10;
-                textarea.inputEl.cols = 25;
-            });
-
-        containerEl.createEl('hr', { cls: 'readitnever-setting-hr' });
-        detailsEl = this.createDetailsElement(containerEl, DetailsItem.TextSnippet);
-        detailsEl.createEl('summary', {
-            text: t('settings.section.textSnippet'),
-            cls: 'readitnever-setting-h3',
-        });
-
-        new Setting(detailsEl)
-            .setName(t('settings.textSnippet.slug.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.textSnippetContentType)
-                    .setValue(
-                        typeof this.plugin.settings.textSnippetContentType === 'undefined'
-                            ? DEFAULT_SETTINGS.textSnippetContentType
-                            : this.plugin.settings.textSnippetContentType,
-                    )
-                    .onChange(async (value) => {
-                        this.plugin.settings.textSnippetContentType = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.textSnippet.title.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addText((text) =>
-                text
-                    .setPlaceholder(DEFAULT_SETTINGS.textSnippetNoteTitle)
-                    .setValue(this.plugin.settings.textSnippetNoteTitle || DEFAULT_SETTINGS.textSnippetNoteTitle)
-                    .onChange(async (value) => {
-                        this.plugin.settings.textSnippetNoteTitle = value;
-                        await this.plugin.saveSettings();
-                    }),
-            );
-
-        new Setting(detailsEl)
-            .setName(t('settings.textSnippet.template.name'))
-            .setDesc(this.createTemplateVariableReferenceDiv())
-            .addTextArea((textarea) => {
-                textarea
-                    .setValue(this.plugin.settings.textSnippetNote || DEFAULT_SETTINGS.textSnippetNote)
-                    .onChange(async (value) => {
-                        this.plugin.settings.textSnippetNote = value;
-                        await this.plugin.saveSettings();
-                    });
-                textarea.inputEl.rows = 10;
-                textarea.inputEl.cols = 25;
-            });
-
-        new Setting(containerEl).setName(t('settings.advanced.heading')).setHeading();
-
-        const defaultFilesystemLimits = getDefaultFilesystenLimits(Platform);
-
+    private addSecretSetting(containerEl: HTMLElement, key: string, name: string, desc: string | DocumentFragment) {
+        let input: TextComponent;
         new Setting(containerEl)
-            .setName(t('settings.filesystemLimitPath.name'))
-            .setDesc(t('settings.filesystemLimitPath.desc', { limit: defaultFilesystemLimits.path }))
-            .addText((text) =>
-                text.setPlaceholder(String(defaultFilesystemLimits.path)).onChange(async (value) => {
-                    const trimmedValue = value.trim();
-                    if (trimmedValue !== '' && Number.isNaN(Number(trimmedValue))) {
-                        new Notice(t('notice.maxPathLengthNumber'));
-                        return;
-                    }
-                    if (trimmedValue === '') {
-                        this.plugin.settings.filesystemLimitPath = null;
-                    } else {
-                        this.plugin.settings.filesystemLimitPath = Number(trimmedValue);
-                    }
-                    await this.plugin.saveSettings();
-                }),
-            );
-
-        new Setting(containerEl)
-            .setName(t('settings.filesystemLimitFileName.name'))
-            .setDesc(t('settings.filesystemLimitFileName.desc', { limit: defaultFilesystemLimits.fileName }))
-            .addText((text) =>
-                text.setPlaceholder(String(defaultFilesystemLimits.fileName)).onChange(async (value) => {
-                    const trimmedValue = value.trim();
-                    if (trimmedValue !== '' && Number.isNaN(Number(trimmedValue))) {
-                        new Notice(t('notice.maxFileNameLengthNumber'));
-                        return;
-                    }
-                    if (trimmedValue === '') {
-                        this.plugin.settings.filesystemLimitFileName = null;
-                    } else {
-                        this.plugin.settings.filesystemLimitFileName = Number(trimmedValue);
-                    }
-                    await this.plugin.saveSettings();
-                }),
+            .setName(name)
+            .setDesc(desc)
+            .addText((text) => {
+                input = text;
+                text.inputEl.type = 'password';
+                text.inputEl.autocomplete = 'off';
+                text.setValue(String(this.getValue(key) ?? '')).onChange((value) => this.setValue(key, value.trim()));
+            })
+            .addExtraButton((button) =>
+                button
+                    .setIcon('eye')
+                    .setTooltip(t('settings.secret.toggleVisibility'))
+                    .onClick(() => {
+                        const hidden = input.inputEl.type === 'password';
+                        input.inputEl.type = hidden ? 'text' : 'password';
+                        button.setIcon(hidden ? 'eye-off' : 'eye');
+                    }),
             );
     }
 
-    private createDetailsElement(parentElement: HTMLElement, itemId: DetailsItem): HTMLElement {
-        const details = parentElement.createEl('details');
-        details.addEventListener('toggle', () => {
-            if (details.open) {
-                this.activeDetatils.push(itemId);
-            } else {
-                this.activeDetatils = this.activeDetatils.filter((item) => item !== itemId);
+    private addTemplateSetting(
+        containerEl: HTMLElement,
+        key: string,
+        name: string,
+        variables: string[],
+        options: { multiline: boolean },
+    ): void {
+        let input: TemplateInput;
+        const setting = new Setting(containerEl).setName(name);
+        setting.settingEl.addClass('rin-setting-template');
+
+        if (options.multiline) {
+            setting.settingEl.addClass('rin-setting-stacked');
+            setting.addTextArea((textarea) => {
+                input = textarea;
+                textarea.inputEl.rows = 10;
+                textarea.inputEl.addClass('rin-template-input');
+            });
+        } else {
+            setting.addText((text) => {
+                input = text;
+                text.inputEl.addClass('rin-template-input');
+            });
+        }
+
+        input
+            .setPlaceholder(String(DEFAULT_SETTINGS[key]))
+            .setValue(String(this.getValue(key) ?? ''))
+            .onChange((value) => this.setValue(key, value));
+
+        this.addResetButton(setting, key, () => input.setValue(String(DEFAULT_SETTINGS[key])));
+
+        // An empty template would produce empty notes or nameless files; restore the default instead.
+        input.inputEl.addEventListener('blur', () => {
+            if (input.getValue().trim() === '') {
+                input.setValue(String(DEFAULT_SETTINGS[key]));
+                this.setValue(key, DEFAULT_SETTINGS[key]);
             }
         });
 
-        if (this.activeDetatils.includes(itemId)) {
-            details.setAttribute('open', '');
+        if (variables.length > 0) {
+            const variablesEl = setting.descEl.createDiv({ cls: 'rin-variable-chips' });
+            variablesEl.createSpan({ text: t('settings.template.variables'), cls: 'rin-variable-chips-label' });
+            for (const variable of variables) {
+                const chipEl = variablesEl.createEl('button', {
+                    text: variable,
+                    cls: 'rin-variable-chip',
+                    attr: { 'aria-label': t('settings.template.insertVariable', { variable }) },
+                });
+                chipEl.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    this.insertAtCursor(input.inputEl, `{{ ${variable} }}`);
+                });
+            }
         }
-
-        return details;
     }
 
-    private createTemplateVariableReferenceDiv(prepend = ''): DocumentFragment {
-        return createHTMLDiv(
-            `<p>${prepend} ${t(
-                'settings.templateVariableReference.see',
-            )}<a href="https://github.com/DominikPieper/obsidian-ReadItNever?tab=readme-ov-file#template-engine">${t(
-                'settings.templateVariableReference.link',
-            )}</a></p>`,
+    private insertAtCursor(inputEl: HTMLInputElement | HTMLTextAreaElement, text: string): void {
+        const start = inputEl.selectionStart ?? inputEl.value.length;
+        const end = inputEl.selectionEnd ?? inputEl.value.length;
+        inputEl.setRangeText(text, start, end, 'end');
+        inputEl.focus();
+        // Notify the Setting component so the change is persisted.
+        inputEl.dispatchEvent(new Event('input'));
+    }
+
+    private addResetButton(setting: Setting, key: string, onReset: () => void): void {
+        setting.addExtraButton((button) =>
+            button
+                .setIcon('rotate-ccw')
+                .setTooltip(t('settings.resetToDefault'))
+                .onClick(() => {
+                    this.setValue(key, DEFAULT_SETTINGS[key]);
+                    onReset();
+                }),
         );
+    }
+
+    private addToggleSetting(
+        containerEl: HTMLElement,
+        key: string,
+        name: string,
+        desc: string,
+        options: { rerender?: boolean } = {},
+    ): void {
+        new Setting(containerEl)
+            .setName(name)
+            .setDesc(desc)
+            .addToggle((toggle) =>
+                toggle.setValue(Boolean(this.getValue(key))).onChange(async (value) => {
+                    this.plugin.settings[key] = value;
+                    await this.plugin.saveSettings();
+                    if (options.rerender) {
+                        this.display();
+                    }
+                }),
+            );
+    }
+
+    private addNumberSetting(containerEl: HTMLElement, key: string, name: string, desc: string): void {
+        new Setting(containerEl)
+            .setName(name)
+            .setDesc(desc)
+            .addText((text) => {
+                text.inputEl.type = 'number';
+                text.inputEl.min = '1';
+                text.setPlaceholder(String(DEFAULT_SETTINGS[key]))
+                    .setValue(String(this.getValue(key)))
+                    .onChange((value) => {
+                        const parsed = parseInt(value, 10);
+                        this.setValue(key, Number.isNaN(parsed) || parsed < 1 ? DEFAULT_SETTINGS[key] : parsed);
+                    });
+            });
+    }
+
+    private addOptionalNumberSetting(
+        containerEl: HTMLElement,
+        key: string,
+        name: string,
+        desc: string,
+        defaultValue: number,
+    ): void {
+        new Setting(containerEl)
+            .setName(name)
+            .setDesc(desc)
+            .addText((text) => {
+                text.inputEl.type = 'number';
+                text.inputEl.min = '1';
+                const current = this.plugin.settings[key];
+                text.setPlaceholder(String(defaultValue))
+                    .setValue(current === null || current === undefined ? '' : String(current))
+                    .onChange((value) => {
+                        const parsed = parseInt(value.trim(), 10);
+                        // Empty or invalid input falls back to the platform default.
+                        this.setValue(key, Number.isNaN(parsed) || parsed < 1 ? null : parsed);
+                    });
+            });
+    }
+
+    private addDateFormatSetting(containerEl: HTMLElement, key: string, name: string, desc: string): void {
+        const previewEl = createSpan({ cls: 'rin-date-preview' });
+        const updatePreview = (format: string) =>
+            previewEl.setText(t('settings.dateFormat.preview', { preview: formatCurrentDate(format) }));
+
+        const descFragment = createFragment((fragment) => {
+            fragment.appendText(desc);
+            fragment.createEl('br');
+            fragment.append(previewEl);
+        });
+
+        new Setting(containerEl)
+            .setName(name)
+            .setDesc(descFragment)
+            .addMomentFormat((format) =>
+                format
+                    .setDefaultFormat(String(DEFAULT_SETTINGS[key]))
+                    .setValue(String(this.getValue(key)))
+                    .onChange((value) => {
+                        this.setValue(key, value);
+                        updatePreview(value || String(DEFAULT_SETTINGS[key]));
+                    }),
+            );
+
+        updatePreview(String(this.getValue(key)) || String(DEFAULT_SETTINGS[key]));
+    }
+
+    private addEmbedSizeSetting(containerEl: HTMLElement, widthKey: string, heightKey: string): void {
+        new Setting(containerEl)
+            .setName(t('settings.embedSize.name'))
+            .setDesc(t('settings.embedSize.desc'))
+            .addText((text) => {
+                text.inputEl.addClass('rin-embed-size-input');
+                text.setPlaceholder(String(DEFAULT_SETTINGS[widthKey]))
+                    .setValue(String(this.getValue(widthKey)))
+                    .onChange((value) => this.setValue(widthKey, value.trim()));
+            })
+            .addText((text) => {
+                text.inputEl.addClass('rin-embed-size-input');
+                text.setPlaceholder(String(DEFAULT_SETTINGS[heightKey]))
+                    .setValue(String(this.getValue(heightKey)))
+                    .onChange((value) => this.setValue(heightKey, value.trim()));
+            });
     }
 }

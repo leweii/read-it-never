@@ -83,7 +83,31 @@ Converts number to lexified format.
 ```
 {{ 12682|numberLexify}}
 
-outputs: 12.6K
+outputs: 12.7K
+```
+</details>
+
+<details>
+<summary>join</summary>
+
+Joins array items with a separator (default `,`).
+
+```
+{{ tags|join(', ') }}
+
+outputs: a, b, c
+```
+</details>
+
+<details>
+<summary>map</summary>
+
+Picks a property from every object in an array. Usually combined with `join`.
+
+```
+{{ authors|map('name')|join(', ') }}
+
+outputs: Ada, Grace
 ```
 </details>
 
@@ -108,6 +132,18 @@ Replaces all occurrences in input value.
 {{ 'Hello world'|replace('o') }}
 
 outputs: Hell wrld
+```
+</details>
+
+<details>
+<summary>striptags</summary>
+
+Removes HTML tags. Optionally keeps a comma separated list of allowed tags.
+
+```
+{{ '<p>Hello <b>world</b></p>'|striptags('b') }}
+
+outputs: Hello <b>world</b>
 ```
 </details>
 
@@ -141,7 +177,7 @@ Available content types are ordered by URL detection priority.
 
 ### Website Article
 
-Will be parsed to readable form using [Mozilla Readability](https://github.com/mozilla/readability) and then converted to markdown. In case website content is marked by [Readbility](https://github.com/mozilla/readability) as not readable, empty note with URL will be created.
+Will be parsed to readable form using [Mozilla Readability](https://github.com/mozilla/readability) and then converted to markdown. In case website content is marked by [Readbility](https://github.com/mozilla/readability) as not readable, a note with the URL (and the page's OpenGraph title/description when available) will be created; its file name template can use `{{ title }}` and `{{ date }}`.
 
 If enabled, images will be downloaded to folder (default is `Read It Never Inbox/assets`) configured in plugin settings. (Supported only on desktop for now)
 
@@ -154,7 +190,7 @@ If enabled, images will be downloaded to folder (default is `Read It Never Inbox
 |---------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | articleTitle              | Article title from `<title>` HTML tag                                                                                                                                                     |
 | articleURL                | Article URL                                                                                                                                                                               |
-| articleReadingTime        | Estimated reading time in minutes by Readbility.js                                                                                                                                        |
+| articleReadingTime        | Estimated reading time in minutes (CJK text is counted by characters)                                                                                                                     |
 | articleContent            | Article content                                                                                                                                                                           |
 | date                      | Current date in format from plugin settings                                                                                                                                               |
 | previewURL                | Aritlce preview image URL parsed from [OpenGraph](https://ogp.me/) or [Twitter](https://developer.twitter.com/en/docs/twitter-for-websites/cards/overview/markup) image `<meta>` property |

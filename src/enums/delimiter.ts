@@ -1,4 +1,5 @@
 import { DropdownEnumOption } from './enum';
+import { t } from 'src/i18n';
 
 export enum Delimiter {
     NewLine = 'newLine',
@@ -9,10 +10,10 @@ export enum Delimiter {
 
 export function getDelimiterOptions(): DropdownEnumOption[] {
     return [
-        { label: 'New Line', option: Delimiter.NewLine },
-        { label: 'Comma', option: Delimiter.Comma },
-        { label: 'Period', option: Delimiter.Period },
-        { label: 'Semicolon', option: Delimiter.Semicolon },
+        { label: t('settings.delimiter.newLine'), option: Delimiter.NewLine },
+        { label: t('settings.delimiter.comma'), option: Delimiter.Comma },
+        { label: t('settings.delimiter.period'), option: Delimiter.Period },
+        { label: t('settings.delimiter.semicolon'), option: Delimiter.Semicolon },
     ];
 }
 

@@ -2,7 +2,10 @@ import { TFile } from 'obsidian';
 import { Note } from 'src/parsers/Note';
 
 export interface VaultRepository {
-    saveNote(note: Note): Promise<void>;
+    /**
+     * Writes the note to the vault. Throws `FileExistsError` if a note with the same path exists.
+     */
+    saveNote(note: Note): Promise<TFile>;
 
     createDirectory(directoryPath: string): Promise<void>;
 
@@ -10,5 +13,5 @@ export interface VaultRepository {
 
     getFileByPath(filePath: string): TFile;
 
-    appendToExistingNote(note: Note): Promise<void>;
+    appendToExistingNote(note: Note): Promise<TFile>;
 }

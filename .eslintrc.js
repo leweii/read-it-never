@@ -22,7 +22,7 @@ module.exports = {
             modules: true,
         },
     },
-    plugins: ['@typescript-eslint', 'import-x'],
+    plugins: ['@typescript-eslint', 'import-x', '@eslint-community/eslint-comments'],
     rules: {
         'linebreak-style': ['error', 'unix'],
         quotes: ['error', 'single', { avoidEscape: true }],
@@ -47,6 +47,8 @@ module.exports = {
                 ignoreDeclarationSort: true,
             },
         ],
-        'no-useless-escape': 0
+        'no-useless-escape': 0,
+        // Same rule as the Obsidian community plugin review: every eslint directive must say why.
+        '@eslint-community/eslint-comments/require-description': 'error',
     },
 };

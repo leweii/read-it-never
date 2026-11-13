@@ -58,9 +58,7 @@ function createTurndownService(): TurndownService {
         },
         replacement: function (_content, node, options) {
             const codeBlock = node as HTMLElement;
-            codeBlock
-                .querySelectorAll('br-keep')
-                .forEach((br) => br.replaceWith(codeBlock.ownerDocument.createElement('br')));
+            codeBlock.querySelectorAll('br-keep').forEach((br) => br.replaceWith(createEl('br')));
             const langMatch = codeBlock.id?.match(/code-lang-(.+)/);
             const language = langMatch?.length > 0 ? langMatch[1] : '';
             const code = codeBlock.textContent;

@@ -29,7 +29,7 @@ export default class WikipediaParser extends WebsiteParser {
 
         // fix for https://github.com/DominikPieper/obsidian-ReadItNever/issues/174
         document.querySelectorAll('.infobox caption').forEach((element) => {
-            const newParagraph = document.createElement('p');
+            const newParagraph = createEl('p');
             newParagraph.append(...Array.from(element.childNodes));
 
             element.parentElement.insertBefore(newParagraph, element);
@@ -37,7 +37,7 @@ export default class WikipediaParser extends WebsiteParser {
         });
 
         document.querySelectorAll('.wikitable caption').forEach((element) => {
-            const newParagraph = document.createElement('p');
+            const newParagraph = createEl('p');
             newParagraph.append(...Array.from(element.childNodes));
 
             element.parentElement.insertBefore(newParagraph, element);

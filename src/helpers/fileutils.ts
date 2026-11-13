@@ -35,12 +35,11 @@ const FALLBACK_FILENAME = 'Untitled';
  * dots and spaces (Windows rejects trailing ones, leading dots create hidden files).
  */
 export function normalizeFilename(fileName: string, preserveUnicode = true): string {
-    // Control characters (newlines, tabs, ...) are invalid in file names on Windows.
-    /* eslint-disable no-control-regex */
+    /* eslint-disable no-control-regex -- control characters (newlines, tabs, ...) are invalid in file names on Windows and must be matched to be stripped */
     const forbidden = preserveUnicode
         ? /[:#/\\|?*<>"[\]^\u0000-\u001F\u007F]/gu
         : /[:#/\\()|?*<>"[\]^\u0000-\u001F\u007F\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F000}-\u{1F02F}\u{1F0A0}-\u{1F0FF}\u{1F100}-\u{1F64F}\u{1F680}-\u{1F6FF}]/gu;
-    /* eslint-enable no-control-regex */
+    /* eslint-enable no-control-regex -- end of intentional control character ranges */
 
     const normalized = fileName
         .replace(/\s+/g, ' ')

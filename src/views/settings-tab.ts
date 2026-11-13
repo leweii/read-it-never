@@ -149,8 +149,9 @@ export class ReadItNeverSettingsTab extends PluginSettingTab {
                     .addOption(OpenNoteMode.NewTab, t('settings.openNote.newTab'))
                     .setValue(this.getOpenNoteMode())
                     .onChange(async (value) => {
-                        this.plugin.settings.openNewNote = value === OpenNoteMode.CurrentTab;
-                        this.plugin.settings.openNewNoteInNewTab = value === OpenNoteMode.NewTab;
+                        const mode = value as OpenNoteMode;
+                        this.plugin.settings.openNewNote = mode === OpenNoteMode.CurrentTab;
+                        this.plugin.settings.openNewNoteInNewTab = mode === OpenNoteMode.NewTab;
                         await this.plugin.saveSettings();
                     }),
             );
@@ -159,7 +160,9 @@ export class ReadItNeverSettingsTab extends PluginSettingTab {
             .setName(t('settings.fileExistsStrategy.name'))
             .setDesc(t('settings.fileExistsStrategy.desc'))
             .addDropdown((dropdown) => {
-                getFileExistStrategyOptions().forEach((option) => dropdown.addOption(option.option, option.label));
+                for (const option of getFileExistStrategyOptions()) {
+                    dropdown.addOption(option.option, option.label);
+                }
                 dropdown
                     .setValue(this.plugin.settings.fileExistsStrategy ?? DEFAULT_SETTINGS.fileExistsStrategy)
                     .onChange(async (value) => {
@@ -187,7 +190,9 @@ export class ReadItNeverSettingsTab extends PluginSettingTab {
             .setName(t('settings.batchProcessDelimiter.name'))
             .setDesc(t('settings.batchProcessDelimiter.desc'))
             .addDropdown((dropdown) => {
-                getDelimiterOptions().forEach((option) => dropdown.addOption(option.option, option.label));
+                for (const option of getDelimiterOptions()) {
+                    dropdown.addOption(option.option, option.label);
+                }
                 dropdown
                     .setValue(this.plugin.settings.batchProcessDelimiter ?? DEFAULT_SETTINGS.batchProcessDelimiter)
                     .onChange(async (value) => {
@@ -608,7 +613,9 @@ export class ReadItNeverSettingsTab extends PluginSettingTab {
             });
 
         if (options.resettable) {
-            this.addResetButton(setting, key, () => input.setValue(String(DEFAULT_SETTINGS[key])));
+            this.addResetButton(setting, key, () => {
+                input.setValue(String(DEFAULT_SETTINGS[key]));
+            });
         }
 
         return setting;
@@ -667,7 +674,9 @@ export class ReadItNeverSettingsTab extends PluginSettingTab {
             .setValue(String(this.getValue(key) ?? ''))
             .onChange((value) => this.setValue(key, value));
 
-        this.addResetButton(setting, key, () => input.setValue(String(DEFAULT_SETTINGS[key])));
+        this.addResetButton(setting, key, () => {
+            input.setValue(String(DEFAULT_SETTINGS[key]));
+        });
 
         // An empty template would produce empty notes or nameless files; restore the default instead.
         input.inputEl.addEventListener('blur', () => {
